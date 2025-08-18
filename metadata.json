@@ -1,0 +1,7 @@
+{
+  "name": "CNP 2025 Conference App",
+  "description": "The official Progressive Web App for the 29th National Congress of Pneumology (CNP 2025). Browse the schedule, create your personal agenda, and get all the event information right at your fingertips.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
