@@ -3,7 +3,7 @@ import type { Session } from '../../types';
 import { getThemeColor } from '../../constants';
 import { useAgenda } from '../../context/AgendaContext';
 import { X, Check, Plus, Heart, Mic, BrainCircuit, Loader, AlertTriangle, Languages } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
+import Groq from 'groq-sdk';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import LiveTranslator from './LiveTranslator';
 
@@ -75,18 +75,24 @@ const SessionModal: React.FC<SessionModalProps> = ({ session, onClose, startReco
   const generateSummary = async (text: string) => {
     setProcessingState('summarizing');
     try {
-      if (!process.env.API_KEY) {
-        throw new Error("La clé API n'est pas configurée.");
-      }
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `Tu es un assistant expert en pneumologie. Voici la transcription d'une conférence. Fais-en un résumé concis et très clair, structuré en quelques points clés importants. Chaque point doit être sur une nouvelle ligne.\n\nTRANSCRIPTION:\n"${text}"`;
+      const groq = new Groq({ apiKey: process.env.API_KEY, dangerouslyAllowBrowser: true });
       
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
+      const completion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: "Tu es un assistant expert en pneumologie. Ton rôle est de résumer des transcriptions de conférences de manière concise et claire, en structurant le résumé en quelques points clés importants sur des lignes séparées."
+          },
+          {
+            role: "user",
+            content: `Voici la transcription:\n\n"${text}"`
+          }
+        ],
+        model: "llama3-8b-8192"
       });
 
-      const summaryText = response.text;
+      const summaryText = completion.choices[0]?.message?.content || null;
+
       if (summaryText) {
         addSummary(session.id, summaryText);
         setProcessingState('idle');

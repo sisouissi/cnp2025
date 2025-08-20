@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Session } from '../../types';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
-import { GoogleGenAI } from '@google/genai';
+import Groq from 'groq-sdk';
 import { ArrowLeft, Mic, Square, Loader2, Languages, AlertCircle, Maximize, Minimize } from 'lucide-react';
 
 const LANGUAGES = [
@@ -54,17 +54,24 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         setIsTranslating(true);
         setApiError(null);
         try {
-            if (!process.env.API_KEY) throw new Error("Clé API non configurée.");
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const groq = new Groq({ apiKey: process.env.API_KEY, dangerouslyAllowBrowser: true });
             const langName = LANGUAGES.find(l => l.code === targetLang)?.name || 'English';
-            const prompt = `Translate the following French text to ${langName}. Provide only the translation, without any introductory phrases like "Here is the translation:".\n\nTEXT: "${text}"`;
             
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
+            const completion = await groq.chat.completions.create({
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a translation assistant. Translate the user's text from French to ${langName}. Provide only the direct translation, without any extra phrases or explanations.`
+                    },
+                    {
+                        role: "user",
+                        content: text
+                    }
+                ],
+                model: "llama3-8b-8192",
             });
             
-            const translation = response.text;
+            const translation = completion.choices[0]?.message?.content || null;
             if (translation) {
                 setTranslatedText(prev => prev + translation + ' ');
             }
