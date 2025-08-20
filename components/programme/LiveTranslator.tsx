@@ -67,12 +67,13 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                let errorMessage = "Une erreur est survenue lors de la traduction.";
+                let errorMessage = `Erreur serveur (${response.status}).`;
                 try {
                     const errorJson = JSON.parse(errorText);
-                    errorMessage = errorJson.error || errorMessage;
+                    errorMessage = errorJson.error || "Une erreur est survenue lors de la traduction.";
                 } catch (e) {
                     console.error("Server returned non-JSON error:", errorText);
+                    errorMessage = "Impossible de communiquer avec le serveur de traduction. Veuillez réessayer.";
                 }
                 throw new Error(errorMessage);
             }

@@ -86,12 +86,13 @@ const SessionModal: React.FC<SessionModalProps> = ({ session, onClose, startReco
 
       if (!response.ok) {
         const errorText = await response.text();
-        let errorMessage = "Une erreur est survenue lors de la génération du résumé.";
+        let errorMessage = `Erreur serveur (${response.status}).`;
         try {
             const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.error || errorMessage;
+            errorMessage = errorJson.error || "Une erreur est survenue lors de la génération du résumé.";
         } catch (e) {
             console.error("Server returned non-JSON error:", errorText);
+            errorMessage = "Impossible de communiquer avec le serveur de résumé. Veuillez réessayer.";
         }
         throw new Error(errorMessage);
       }
