@@ -65,13 +65,21 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
               })
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-              throw new Error(data.error || "Une erreur est survenue lors de la traduction.");
+                const errorText = await response.text();
+                let errorMessage = "Une erreur est survenue lors de la traduction.";
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    errorMessage = errorJson.error || errorMessage;
+                } catch (e) {
+                    console.error("Server returned non-JSON error:", errorText);
+                }
+                throw new Error(errorMessage);
             }
             
+            const data = await response.json();
             const translation = data.result;
+
             if (translation) {
                 setTranslatedText(prev => prev + translation + ' ');
             }

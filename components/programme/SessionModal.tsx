@@ -84,13 +84,21 @@ const SessionModal: React.FC<SessionModalProps> = ({ session, onClose, startReco
         })
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "Une erreur est survenue lors de la génération du résumé.");
+        const errorText = await response.text();
+        let errorMessage = "Une erreur est survenue lors de la génération du résumé.";
+        try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorMessage;
+        } catch (e) {
+            console.error("Server returned non-JSON error:", errorText);
+        }
+        throw new Error(errorMessage);
       }
-
+      
+      const data = await response.json();
       const summaryText = data.result;
+
       if (summaryText) {
         addSummary(session.id, summaryText);
         setProcessingState('idle');
