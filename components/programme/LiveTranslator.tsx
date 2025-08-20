@@ -19,6 +19,8 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     const [targetLang, setTargetLang] = useState('auto');
     const [translatedText, setTranslatedText] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
+    const [isRetrying, setIsRetrying] = useState(false);
+    const [isPendingTranslation, setIsPendingTranslation] = useState(false);
     const [apiError, setApiError] = useState<string | null>(null);
     const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
     
@@ -186,7 +188,29 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                 return;
             }
             console.error('Erreur traduction:', error);
-            setApiError(error.message || "Erreur de traduction");
+            
+            // Afficher une erreur plus explicite
+            let errorMessage = "Erreur de traduction";
+            if (error.message.includes('500')) {
+                errorMessage = "Erreur serveur - Vérifiez la configuration API";
+            } else if (error.message.includes('network')) {
+                errorMessage = "Erreur de connexion réseau";
+            } else if (error.message.includes('timeout')) {
+                errorMessage = "Délai d'attente dépassé";
+            }
+            
+            setApiError(errorMessage);
+            
+            // Réessayer automatiquement après 3 secondes pour les erreurs temporaires
+            if (error.message.includes('500') || error.message.includes('network')) {
+                setIsRetrying(true);
+                setTimeout(() => {
+                    console.log('Tentative de nouvelle traduction...');
+                    setApiError(null);
+                    setIsRetrying(false);
+                    translateText(text);
+                }, 3000);
+            }
         } finally {
             isProcessingRef.current = false;
             setIsTranslating(false);
@@ -214,12 +238,14 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             debounceTimerRef.current = window.setTimeout(processTranscript, 1000);
         } else if (!isListening && fullTranscript.length > sentTranscriptRef.current.length) {
             // Traitement immédiat quand l'écoute s'arrête
+            setIsPendingTranslation(false);
             processTranscript();
         }
 
         return () => {
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);
+                setIsPendingTranslation(false);
             }
         };
     }, [fullTranscript, isListening, translateText]);
@@ -235,6 +261,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             // Reset de l'état
             setTranslatedText('');
             setDetectedLanguage(null);
+            setIsPendingTranslation(false);
             sentTranscriptRef.current = '';
             setApiError(null);
             isProcessingRef.current = false;
@@ -302,27 +329,41 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                                 </span>
                             )}
                         </h3>
-                        {isTranslating && (
+                        {(isTranslating || isRetrying || isPendingTranslation) && (
                             <div className="flex items-center gap-2 text-xs text-slate-500">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                Traduction en cours...
+                                <div className={`w-2 h-2 rounded-full animate-pulse ${
+                                    isPendingTranslation ? 'bg-orange-500' : 'bg-green-500'
+                                }`}></div>
+                                {isRetrying ? 'Reconnexion...' : 
+                                 isPendingTranslation ? 'Traduction imminente...' : 
+                                 'Traduction en cours...'}
                             </div>
                         )}
                     </div>
                     
-                    {!isListening && !translatedText ? (
+                    {!isListening && !translatedText && !isPendingTranslation ? (
                         <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 -mt-8">
                             <Languages size={48} className="mb-4 text-slate-400" />
                             <h3 className="text-lg font-semibold">Prêt à traduire</h3>
                             <p>Appuyez sur le bouton du microphone pour commencer.</p>
                         </div>
                     ) : (
-                        <div className="text-slate-800 whitespace-pre-wrap leading-relaxed text-lg break-words">
-                            {translatedText}
-                            {isTranslating && (
-                                <span className="inline-block w-2.5 h-6 bg-slate-600 animate-pulse ml-1 align-bottom rounded-sm"></span>
+                        <>
+                            {isPendingTranslation && !translatedText && (
+                                <div className="flex items-center justify-center text-orange-600 text-sm mb-4">
+                                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse mr-2"></div>
+                                    Préparation de la traduction...
+                                </div>
                             )}
-                        </div>
+                            <div className="text-slate-800 whitespace-pre-wrap leading-relaxed text-lg break-words">
+                                {translatedText}
+                                {(isTranslating || isRetrying || isPendingTranslation) && (
+                                    <span className={`inline-block w-2.5 h-6 animate-pulse ml-1 align-bottom rounded-sm ${
+                                        isPendingTranslation ? 'bg-orange-500' : 'bg-slate-600'
+                                    }`}></span>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

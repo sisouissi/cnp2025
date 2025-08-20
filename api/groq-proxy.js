@@ -58,10 +58,7 @@ const createTranslationPrompt = (text, targetLang, detectedLang) => {
     const targetLanguage = languageMap[targetLang] || 'English';
     
     return {
-      system: `You are a professional translator. Translate the following text to ${targetLanguage}. 
-- Provide only the translation, no explanations
-- When translating longer speech segments, add a line break after every 5-6 lines of text for better readability
-- Keep the natural flow and conversational tone`,
+      system: `You are a professional translator. Translate the following text to ${targetLanguage}. Provide only the translation, no explanations.`,
       user: text,
       targetLanguage: targetLanguage.toLowerCase()
     };
@@ -85,7 +82,14 @@ export default async function handler(request, response) {
     }
     
     // Vercel analyse généralement le corps pour le JSON, mais nous ajoutons une vérification pour la robustesse.
-    const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body;
+    let body;
+    try {
+      body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body;
+    } catch (parseError) {
+      console.error('Erreur parsing du body:', parseError);
+      return sendJson(response, 400, { error: 'Corps de requête JSON invalide.' });
+    }
+
     const { type, payload } = body || {};
 
     if (!type || !payload) {
@@ -132,11 +136,16 @@ export default async function handler(request, response) {
         return sendJson(response, 400, { error: 'Le texte pour la traduction est manquant.' });
       }
 
+      // Validation de la langue cible
+      if (targetLang && !['auto', 'fr', 'en', 'es'].includes(targetLang)) {
+        return sendJson(response, 400, { error: 'Langue cible non supportée.' });
+      }
+
       // Détecter la langue du texte d'entrée
       const detectedSourceLang = detectLanguage(text);
       
       // Créer le prompt adapté
-      const prompts = createTranslationPrompt(text, targetLang, detectedSourceLang);
+      const prompts = createTranslationPrompt(text, targetLang || 'auto', detectedSourceLang);
       
       const messages = [
         { role: "system", content: prompts.system },
@@ -175,65 +184,76 @@ export default async function handler(request, response) {
             model, 
             stream: true,
             temperature: 0.1, // Très faible pour plus de cohérence
-            max_tokens: 500,   // Limite raisonnable
-            top_p: 0.9
+            max_tokens: 200,   // Limite plus basse pour des réponses plus rapides
+            top_p: 0.9,
+            presence_penalty: 0,
+            frequency_penalty: 0
           })
         });
 
         if (!groqResponse.ok) {
           const errorBody = await groqResponse.text();
-          console.error('Erreur API Groq (translate):', errorBody);
-          response.write(`data: {"error": "API Error: ${groqResponse.status}"}\n\n`);
+          console.error('Erreur API Groq (translate):', groqResponse.status, errorBody);
+          response.write(`data: {"error": "API Groq Error: ${groqResponse.status}"}\n\n`);
+          response.write('data: [DONE]\n\n');
+          response.end();
+          return;
+        }
+
+        if (!groqResponse.body) {
+          console.error('Pas de body dans la réponse Groq');
+          response.write(`data: {"error": "Pas de réponse du serveur Groq"}\n\n`);
           response.write('data: [DONE]\n\n');
           response.end();
           return;
         }
 
         console.log('Streaming démarré depuis Groq...');
-        // Stream les données directement
-        const reader = groqResponse.body.getReader();
-        const decoder = new TextDecoder();
-
+        
         // Stream les données directement avec gestion des chunks
         const reader = groqResponse.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) {
-            console.log('Streaming Groq terminé');
-            break;
-          }
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+              console.log('Streaming Groq terminé');
+              break;
+            }
 
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Traiter les lignes complètes seulement
-          let lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Garder la dernière ligne incomplète
-          
-          for (const line of lines) {
-            if (line.trim()) {
-              console.log('Ligne envoyée:', line.substring(0, 100));
-              response.write(`${line}\n`);
-              
-              // Forcer l'envoi immédiat
-              if (response.flush) {
-                response.flush();
+            buffer += decoder.decode(value, { stream: true });
+            
+            // Traiter les lignes complètes seulement
+            let lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Garder la dernière ligne incomplète
+            
+            for (const line of lines) {
+              if (line.trim()) {
+                response.write(`${line}\n`);
+                
+                // Forcer l'envoi immédiat
+                if (response.flush) {
+                  response.flush();
+                }
               }
             }
           }
+
+          // Traiter le buffer restant
+          if (buffer.trim()) {
+            response.write(`${buffer}\n`);
+          }
+
+        } catch (streamError) {
+          console.error('Erreur dans le streaming:', streamError);
+          response.write(`data: {"error": "Erreur de streaming"}\n\n`);
         }
 
-        // Traiter le buffer restant
-        if (buffer.trim()) {
-          console.log('Buffer final:', buffer.substring(0, 100));
-          response.write(`${buffer}\n`);
-        }
-
-      } catch (streamError) {
-        console.error('Erreur streaming:', streamError);
-        response.write(`data: {"error": "Stream error"}\n\n`);
+      } catch (groqError) {
+        console.error('Erreur lors de l\'appel Groq:', groqError);
+        response.write(`data: {"error": "Erreur de connexion à Groq: ${groqError.message}"}\n\n`);
       }
 
       // Terminer le stream
