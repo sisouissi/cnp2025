@@ -18,8 +18,6 @@ interface LiveTranslatorProps {
 const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     const [targetLang, setTargetLang] = useState('auto');
     const [translatedText, setTranslatedText] = useState('');
-    const [translatedParagraphs, setTranslatedParagraphs] = useState<string[]>([]);
-    const [currentParagraph, setCurrentParagraph] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
     const [apiError, setApiError] = useState<string | null>(null);
     const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
@@ -51,7 +49,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     useEffect(() => {
         const timer = requestAnimationFrame(scrollToBottom);
         return () => cancelAnimationFrame(timer);
-    }, [translatedParagraphs, currentParagraph, scrollToBottom]);
+    }, [translatedText, scrollToBottom]);
 
     // Fonction pour formater le texte en paragraphes
     const formatTextIntoParagraphs = useCallback((text: string) => {
@@ -120,23 +118,14 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
-            // Créer un nouveau paragraphe pour chaque traduction
-            const newParagraphIndex = translatedParagraphs.length;
-            setCurrentParagraph('');
+            // Ajouter un saut de ligne avant la nouvelle traduction si il y a déjà du texte
+            if (translatedText.trim()) {
+                setTranslatedText(prev => prev + '\n\n');
+            }
 
             while (true) {
                 const { value, done } = await reader.read();
-                if (done) {
-                    // Finaliser le paragraphe courant
-                    setCurrentParagraph(prev => {
-                        if (prev.trim()) {
-                            setTranslatedParagraphs(existing => [...existing, prev.trim()]);
-                            return '';
-                        }
-                        return prev;
-                    });
-                    break;
-                }
+                if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
                 const lines = chunk.split('\n');
@@ -147,13 +136,6 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                     const data = line.substring(6).trim();
                     if (data === '[DONE]') {
                         console.log('Traduction terminée');
-                        // Finaliser le dernier paragraphe
-                        setCurrentParagraph(prev => {
-                            if (prev.trim()) {
-                                setTranslatedParagraphs(existing => [...existing, prev.trim()]);
-                            }
-                            return '';
-                        });
                         return;
                     }
                     
@@ -168,51 +150,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                         // Gérer le contenu de traduction
                         const contentDelta = parsed.choices?.[0]?.delta?.content;
                         if (contentDelta) {
-                            setCurrentParagraph(prev => {
-                                const newText = prev + contentDelta;
-                                
-                                // Vérifier s'il y a des sauts de ligne ou des paragraphes naturels
-                                if (contentDelta.includes('\n\n') || contentDelta.includes('\n')) {
-                                    // Diviser par les doubles sauts de ligne
-                                    const parts = newText.split(/\n\s*\n/);
-                                    if (parts.length > 1) {
-                                        // Ajouter les paragraphes complets
-                                        for (let i = 0; i < parts.length - 1; i++) {
-                                            if (parts[i].trim()) {
-                                                setTranslatedParagraphs(existing => [...existing, parts[i].trim()]);
-                                            }
-                                        }
-                                        // Garder la dernière partie comme paragraphe courant
-                                        return parts[parts.length - 1] || '';
-                                    }
-                                }
-                                
-                                // Diviser par phrases longues (plus de 150 caractères)
-                                if (newText.length > 150 && /[.!?]\s/.test(newText)) {
-                                    const sentences = newText.split(/([.!?]\s+)/).filter(s => s.trim());
-                                    let accumulatedText = '';
-                                    let remainingText = '';
-                                    
-                                    for (let i = 0; i < sentences.length; i += 2) {
-                                        const sentence = sentences[i] + (sentences[i + 1] || '');
-                                        accumulatedText += sentence;
-                                        
-                                        // Si on dépasse 2 phrases ou 150 caractères, créer un paragraphe
-                                        if (accumulatedText.split(/[.!?]/).length > 3 || accumulatedText.length > 150) {
-                                            if (accumulatedText.trim()) {
-                                                setTranslatedParagraphs(existing => [...existing, accumulatedText.trim()]);
-                                            }
-                                            accumulatedText = '';
-                                            remainingText = sentences.slice(i + 2).join('');
-                                            break;
-                                        }
-                                    }
-                                    
-                                    return remainingText || accumulatedText;
-                                }
-                                
-                                return newText;
-                            });
+                            setTranslatedText(prev => prev + contentDelta);
                         }
                     } catch (parseError) {
                         console.warn('Erreur parsing:', data);
@@ -232,7 +170,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             setIsTranslating(false);
             abortControllerRef.current = null;
         }
-    }, [targetLang, translatedParagraphs.length]);
+    }, [targetLang, translatedText]);
 
     // Gestion de la transcription avec debounce optimisé
     useEffect(() => {
@@ -273,8 +211,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             }
         } else {
             // Reset de l'état
-            setTranslatedParagraphs([]);
-            setCurrentParagraph('');
+            setTranslatedText('');
             setDetectedLanguage(null);
             sentTranscriptRef.current = '';
             setApiError(null);
@@ -346,29 +283,17 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                         )}
                     </div>
                     
-                    {!isListening && translatedParagraphs.length === 0 && !currentParagraph ? (
+                    {!isListening && !translatedText ? (
                         <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 -mt-8">
                             <Languages size={48} className="mb-4 text-slate-400" />
                             <h3 className="text-lg font-semibold">Prêt à traduire</h3>
                             <p>Appuyez sur le bouton du microphone pour commencer.</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            {translatedParagraphs.map((paragraph, index) => (
-                                <p 
-                                    key={index} 
-                                    className="text-slate-800 leading-relaxed text-lg p-3 bg-slate-50 rounded-lg border-l-4 border-blue-200"
-                                >
-                                    {paragraph}
-                                </p>
-                            ))}
-                            {currentParagraph && (
-                                <p className="text-slate-800 leading-relaxed text-lg p-3 bg-slate-50 rounded-lg border-l-4 border-green-200">
-                                    {currentParagraph}
-                                    {isTranslating && (
-                                        <span className="inline-block w-2.5 h-6 bg-slate-600 animate-pulse ml-1 align-bottom rounded-sm"></span>
-                                    )}
-                                </p>
+                        <div className="text-slate-800 whitespace-pre-wrap leading-relaxed text-lg break-words">
+                            {translatedText}
+                            {isTranslating && (
+                                <span className="inline-block w-2.5 h-6 bg-slate-600 animate-pulse ml-1 align-bottom rounded-sm"></span>
                             )}
                         </div>
                     )}

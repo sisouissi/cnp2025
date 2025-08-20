@@ -60,9 +60,8 @@ const createTranslationPrompt = (text, targetLang, detectedLang) => {
     return {
       system: `You are a professional translator. Translate the following text to ${targetLanguage}. 
 - Provide only the translation, no explanations
-- Structure your translation in clear paragraphs when the content is long
-- Add line breaks between different ideas or topics
-- Keep the natural flow and readability of the text`,
+- When translating longer speech segments, add a line break after every 5-6 lines of text for better readability
+- Keep the natural flow and conversational tone`,
       user: text,
       targetLanguage: targetLanguage.toLowerCase()
     };
