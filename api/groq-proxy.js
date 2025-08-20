@@ -9,42 +9,47 @@ const sendJson = (response, statusCode, data) => {
   response.status(statusCode).json(data);
 };
 
-// Fonction pour détecter la langue d'un texte
+// Fonction simplifiée pour détecter la langue d'un texte
 const detectLanguage = (text) => {
-  // Détection simple basée sur des patterns courants
-  const patterns = {
-    'français': /\b(le|la|les|un|une|des|et|ou|que|qui|avec|dans|pour|sur|par|de|du|est|sont|avoir|être)\b/i,
-    'anglais': /\b(the|and|or|that|which|with|in|for|on|by|of|is|are|have|be|to|a|an)\b/i,
-    'espagnol': /\b(el|la|los|las|un|una|y|o|que|con|en|para|por|de|es|son|tener|ser|estar)\b/i,
-    'arabe': /[\u0600-\u06FF]/
-  };
-
-  let scores = {};
-  
-  for (const [lang, pattern] of Object.entries(patterns)) {
-    const matches = text.match(new RegExp(pattern.source, 'gi')) || [];
-    scores[lang] = matches.length;
+  // Patterns plus simples et efficaces
+  if (/\b(le|la|les|un|une|des|et|de|du|que|qui|avec|dans|pour|sur|par|est|sont|avoir|être|vous|nous|ils|elle)\b/i.test(text)) {
+    return 'français';
   }
-
-  // Retourner la langue avec le score le plus élevé
-  const detectedLang = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
-  return scores[detectedLang] > 0 ? detectedLang : 'inconnu';
+  if (/\b(the|and|or|that|which|with|in|for|on|by|of|is|are|have|be|to|you|we|they|she|he)\b/i.test(text)) {
+    return 'anglais';
+  }
+  if (/\b(el|la|los|las|un|una|y|o|que|con|en|para|por|de|es|son|tener|ser|estar|usted|nosotros)\b/i.test(text)) {
+    return 'espagnol';
+  }
+  if (/[\u0600-\u06FF]/.test(text)) {
+    return 'arabe';
+  }
+  return 'français'; // Par défaut
 };
 
-// Fonction pour créer le prompt de traduction adapté
-const createTranslationPrompt = (text, targetLang, langName) => {
+// Fonction pour créer le prompt de traduction optimisé
+const createTranslationPrompt = (text, targetLang, detectedLang) => {
   if (targetLang === 'auto') {
-    // Mode détection automatique
-    return {
-      system: `You are an intelligent translation assistant. Your task is to:
-1. Detect the language of the input text
-2. Translate it to the most appropriate target language based on context
-3. If the text is in French, translate to English
-4. If the text is in English, translate to French  
-5. If the text is in another language, translate to French
-6. Provide only the direct translation without any explanations.`,
-      user: text
-    };
+    // Logique de traduction automatique simplifiée
+    if (detectedLang === 'français') {
+      return {
+        system: `You are a professional translator. Translate the following French text to English. Provide only the translation, no explanations.`,
+        user: text,
+        targetLanguage: 'anglais'
+      };
+    } else if (detectedLang === 'anglais') {
+      return {
+        system: `You are a professional translator. Translate the following English text to French. Provide only the translation, no explanations.`,
+        user: text,
+        targetLanguage: 'français'
+      };
+    } else {
+      return {
+        system: `You are a professional translator. Translate the following text to French. Provide only the translation, no explanations.`,
+        user: text,
+        targetLanguage: 'français'
+      };
+    }
   } else {
     // Mode langue spécifique
     const languageMap = {
@@ -54,11 +59,12 @@ const createTranslationPrompt = (text, targetLang, langName) => {
       'ar': 'Arabic'
     };
     
-    const targetLanguage = languageMap[targetLang] || langName;
+    const targetLanguage = languageMap[targetLang] || 'English';
     
     return {
-      system: `You are a professional translation assistant. Translate the following text to ${targetLanguage}. Provide only the direct translation, without any extra phrases, explanations, or formatting.`,
-      user: text
+      system: `You are a professional translator. Translate the following text to ${targetLanguage}. Provide only the translation, no explanations.`,
+      user: text,
+      targetLanguage: targetLanguage.toLowerCase()
     };
   }
 };
@@ -80,7 +86,6 @@ export default async function handler(request, response) {
     }
     
     // Vercel analyse généralement le corps pour le JSON, mais nous ajoutons une vérification pour la robustesse.
-    // Si le corps est une chaîne, nous l'analysons. Sinon, nous l'utilisons directement.
     const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body;
     const { type, payload } = body || {};
 
@@ -89,7 +94,7 @@ export default async function handler(request, response) {
     }
 
     if (type === 'summarize') {
-      const model = "llama3-70b-8192"; // Utiliser un modèle plus puissant pour des résumés de meilleure qualité
+      const model = "llama3-70b-8192";
       const { text } = payload;
       if (!text) {
         return sendJson(response, 400, { error: 'Le texte pour le résumé est manquant.' });
@@ -121,108 +126,111 @@ export default async function handler(request, response) {
       }
 
     } else if (type === 'translate') {
-      const model = "llama3-8b-8192"; // Utiliser un modèle plus rapide pour une traduction fluide en temps réel
-      const { text, langName, targetLang } = payload;
+      const model = "llama3-8b-8192"; // Modèle rapide pour le streaming
+      const { text, targetLang } = payload;
       
       if (!text) {
         return sendJson(response, 400, { error: 'Le texte pour la traduction est manquant.' });
       }
 
-      // Détecter la langue du texte d'entrée pour le mode automatique
+      // Détecter la langue du texte d'entrée
       const detectedSourceLang = detectLanguage(text);
       
-      // Créer le prompt adapté selon le mode
-      const prompts = createTranslationPrompt(text, targetLang, langName);
+      // Créer le prompt adapté
+      const prompts = createTranslationPrompt(text, targetLang, detectedSourceLang);
       
       const messages = [
         { role: "system", content: prompts.system },
         { role: "user", content: prompts.user }
       ];
 
-      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${groqApiKey}`, 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          messages, 
-          model, 
-          stream: true,
-          temperature: 0.3, // Réduire la créativité pour des traductions plus précises
-          max_tokens: 1000 // Limiter la longueur de réponse
-        })
-      });
-
-      if (!groqResponse.ok) {
-        const errorBody = await groqResponse.text();
-        console.error('Erreur API Groq (translate):', errorBody);
-        return sendJson(response, groqResponse.status, { 
-          error: `L'API Groq a répondu avec le statut ${groqResponse.status}` 
-        });
-      }
-
-      // Configuration des headers pour le streaming
-      response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-      response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      response.setHeader('Pragma', 'no-cache');
-      response.setHeader('Expires', '0');
+      // Configuration headers AVANT l'appel à l'API
+      response.setHeader('Content-Type', 'text/event-stream');
+      response.setHeader('Cache-Control', 'no-cache');
       response.setHeader('Connection', 'keep-alive');
       response.setHeader('Access-Control-Allow-Origin', '*');
       response.setHeader('Access-Control-Allow-Methods', 'POST');
       response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Envoyer les informations de détection de langue au début du stream
+      // Envoyer immédiatement les informations de détection
       if (targetLang === 'auto') {
-        const detectionInfo = JSON.stringify({
+        const detectionData = JSON.stringify({
           choices: [{
             delta: { content: '' },
             detected_language: detectedSourceLang
           }]
         });
-        response.write(`data: ${detectionInfo}\n\n`);
+        response.write(`data: ${detectionData}\n\n`);
       }
 
       try {
+        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${groqApiKey}`, 
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            messages, 
+            model, 
+            stream: true,
+            temperature: 0.1, // Très faible pour plus de cohérence
+            max_tokens: 500,   // Limite raisonnable
+            top_p: 0.9
+          })
+        });
+
+        if (!groqResponse.ok) {
+          const errorBody = await groqResponse.text();
+          console.error('Erreur API Groq (translate):', errorBody);
+          response.write(`data: {"error": "API Error: ${groqResponse.status}"}\n\n`);
+          response.write('data: [DONE]\n\n');
+          response.end();
+          return;
+        }
+
+        // Stream les données directement
         const reader = groqResponse.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = '';
 
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.trim()) {
-              // Transférer les données du stream Groq vers le client
-              response.write(`${line}\n`);
-              
-              // Flush immédiatement pour réduire la latence
-              if (response.flush) {
-                response.flush();
-              }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          
+          // Traiter toutes les lignes complètes
+          for (let i = 0; i < lines.length - 1; i++) {
+            const line = lines[i].trim();
+            if (line && line.startsWith('data: ')) {
+              // Transférer directement la ligne
+              response.write(`${line}\n\n`);
             }
+          }
+          
+          // Garder la dernière ligne incomplète dans le buffer
+          buffer = lines[lines.length - 1];
+        }
+
+        // Traiter toute donnée restante dans le buffer
+        if (buffer.trim()) {
+          const line = buffer.trim();
+          if (line.startsWith('data: ')) {
+            response.write(`${line}\n\n`);
           }
         }
 
-        // Envoyer le signal de fin
-        response.write('data: [DONE]\n\n');
-        response.end();
-        return;
-
       } catch (streamError) {
-        console.error('Erreur lors du streaming:', streamError);
-        if (!response.headersSent) {
-          return sendJson(response, 500, { 
-            error: 'Erreur lors du streaming de la traduction' 
-          });
-        } else {
-          response.write(`data: {"error": "Erreur de streaming"}\n\n`);
-          response.end();
-        }
+        console.error('Erreur streaming:', streamError);
+        response.write(`data: {"error": "Stream error"}\n\n`);
       }
+
+      // Terminer le stream
+      response.write('data: [DONE]\n\n');
+      response.end();
+      return;
 
     } else {
       return sendJson(response, 400, { error: 'Type de requête invalide.' });
@@ -230,7 +238,6 @@ export default async function handler(request, response) {
 
   } catch (error) {
     console.error('Erreur dans la fonction proxy:', error);
-    // S'assurer que nous envoyons toujours une réponse d'erreur JSON
     const errorMessage = error instanceof Error ? error.message : 'Une erreur interne du serveur est survenue.';
     if (!response.headersSent) {
       return sendJson(response, 500, { error: errorMessage });
