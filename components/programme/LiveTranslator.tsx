@@ -54,7 +54,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         setIsTranslating(true);
         setApiError(null);
         try {
-            const groq = new Groq({ apiKey: process.env.API_KEY, dangerouslyAllowBrowser: true });
+            const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, dangerouslyAllowBrowser: true });
             const langName = LANGUAGES.find(l => l.code === targetLang)?.name || 'English';
             
             const completion = await groq.chat.completions.create({

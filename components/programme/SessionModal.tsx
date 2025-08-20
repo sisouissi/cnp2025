@@ -75,7 +75,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ session, onClose, startReco
   const generateSummary = async (text: string) => {
     setProcessingState('summarizing');
     try {
-      const groq = new Groq({ apiKey: process.env.API_KEY, dangerouslyAllowBrowser: true });
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, dangerouslyAllowBrowser: true });
       
       const completion = await groq.chat.completions.create({
         messages: [
