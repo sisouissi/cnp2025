@@ -3,7 +3,6 @@ import type { Session } from '../../types';
 import { getThemeColor } from '../../constants';
 import { useAgenda } from '../../context/AgendaContext';
 import { X, Check, Plus, Heart, Mic, BrainCircuit, Loader, AlertTriangle, Languages } from 'lucide-react';
-import Groq from 'groq-sdk';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import LiveTranslator from './LiveTranslator';
 
@@ -74,25 +73,24 @@ const SessionModal: React.FC<SessionModalProps> = ({ session, onClose, startReco
 
   const generateSummary = async (text: string) => {
     setProcessingState('summarizing');
+    setErrorMessage('');
     try {
-      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, dangerouslyAllowBrowser: true });
-      
-      const completion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: "system",
-            content: "Tu es un assistant expert en pneumologie. Ton rôle est de résumer des transcriptions de conférences de manière concise et claire, en structurant le résumé en quelques points clés importants sur des lignes séparées."
-          },
-          {
-            role: "user",
-            content: `Voici la transcription:\n\n"${text}"`
-          }
-        ],
-        model: "llama3-8b-8192"
+      const response = await fetch('/api/groq-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'summarize',
+          payload: { text: text }
+        })
       });
 
-      const summaryText = completion.choices[0]?.message?.content || null;
+      const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(data.error || "Une erreur est survenue lors de la génération du résumé.");
+      }
+
+      const summaryText = data.result;
       if (summaryText) {
         addSummary(session.id, summaryText);
         setProcessingState('idle');

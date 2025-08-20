@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Session } from '../../types';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
-import Groq from 'groq-sdk';
 import { ArrowLeft, Mic, Square, Loader2, Languages, AlertCircle, Maximize, Minimize } from 'lucide-react';
 
 const LANGUAGES = [
@@ -51,27 +50,28 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
 
     const translateText = async (text: string) => {
         if (!text) return;
+        
         setIsTranslating(true);
         setApiError(null);
         try {
-            const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, dangerouslyAllowBrowser: true });
             const langName = LANGUAGES.find(l => l.code === targetLang)?.name || 'English';
             
-            const completion = await groq.chat.completions.create({
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are a translation assistant. Translate the user's text from French to ${langName}. Provide only the direct translation, without any extra phrases or explanations.`
-                    },
-                    {
-                        role: "user",
-                        content: text
-                    }
-                ],
-                model: "llama3-8b-8192",
+            const response = await fetch('/api/groq-proxy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'translate',
+                payload: { text: text, langName: langName }
+              })
             });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(data.error || "Une erreur est survenue lors de la traduction.");
+            }
             
-            const translation = completion.choices[0]?.message?.content || null;
+            const translation = data.result;
             if (translation) {
                 setTranslatedText(prev => prev + translation + ' ');
             }
