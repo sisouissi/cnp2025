@@ -41,14 +41,14 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     
     const scrollToBottom = useCallback(() => {
         if (translatedPanelRef.current) {
-            translatedPanelRef.current.scrollTop = translatedPanelRef.current.scrollHeight;
+            const element = translatedPanelRef.current;
+            element.scrollTop = element.scrollHeight;
         }
     }, []);
 
-    // Optimisation du scroll
+    // Optimisation du scroll - déclenchement plus fréquent
     useEffect(() => {
-        const timer = requestAnimationFrame(scrollToBottom);
-        return () => cancelAnimationFrame(timer);
+        scrollToBottom();
     }, [translatedText, scrollToBottom]);
 
     // Fonction pour formater le texte en paragraphes
@@ -124,6 +124,10 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             
             // Ajouter un saut de ligne avant la nouvelle traduction si il y a déjà du texte
             setTranslatedText(prev => prev.trim() ? prev + '\n\n' : '');
+            
+            // Indiquer immédiatement que la traduction commence
+            setTranslatedText(prev => prev + '');  // Force le re-render
+            scrollToBottom();
 
             while (true) {
                 const { value, done } = await reader.read();
@@ -158,10 +162,20 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                         const contentDelta = parsed.choices?.[0]?.delta?.content;
                         if (contentDelta) {
                             console.log('Nouveau contenu reçu:', contentDelta);
-                            setTranslatedText(prev => prev + contentDelta);
+                            setTranslatedText(prev => {
+                                const newText = prev + contentDelta;
+                                // Forcer le scroll après la mise à jour
+                                setTimeout(() => scrollToBottom(), 10);
+                                return newText;
+                            });
                         }
                     } catch (parseError) {
-                        console.warn('Erreur parsing:', data, parseError);
+                        // Ignorer silencieusement les erreurs de parsing des chunks incomplets
+                        if (!data.includes('"id"')) {
+                            console.warn('Chunk incomplet ignoré:', data.substring(0, 50));
+                        } else {
+                            console.warn('Erreur parsing chunk complet:', data, parseError);
+                        }
                     }
                 }
             }
@@ -272,7 +286,12 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                 <div 
                     ref={translatedPanelRef} 
                     className="bg-white p-6 overflow-y-auto h-full w-full rounded-lg shadow-inner"
-                    style={{ scrollBehavior: 'smooth' }}
+                    style={{ 
+                        scrollBehavior: 'smooth',
+                        maxHeight: '100%',
+                        overflowY: 'auto',
+                        overflowX: 'hidden'
+                    }}
                 >
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">

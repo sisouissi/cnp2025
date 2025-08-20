@@ -194,6 +194,11 @@ export default async function handler(request, response) {
         const reader = groqResponse.body.getReader();
         const decoder = new TextDecoder();
 
+        // Stream les données directement avec gestion des chunks
+        const reader = groqResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
         while (true) {
           const { value, done } = await reader.read();
           if (done) {
@@ -201,16 +206,29 @@ export default async function handler(request, response) {
             break;
           }
 
-          const chunk = decoder.decode(value, { stream: true });
-          console.log('Chunk Groq reçu:', chunk.substring(0, 100));
+          buffer += decoder.decode(value, { stream: true });
           
-          // Écrire immédiatement chaque chunk reçu
-          response.write(chunk);
+          // Traiter les lignes complètes seulement
+          let lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Garder la dernière ligne incomplète
           
-          // Forcer l'envoi immédiat
-          if (response.flush) {
-            response.flush();
+          for (const line of lines) {
+            if (line.trim()) {
+              console.log('Ligne envoyée:', line.substring(0, 100));
+              response.write(`${line}\n`);
+              
+              // Forcer l'envoi immédiat
+              if (response.flush) {
+                response.flush();
+              }
+            }
           }
+        }
+
+        // Traiter le buffer restant
+        if (buffer.trim()) {
+          console.log('Buffer final:', buffer.substring(0, 100));
+          response.write(`${buffer}\n`);
         }
 
       } catch (streamError) {
