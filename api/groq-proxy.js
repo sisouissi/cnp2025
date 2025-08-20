@@ -163,6 +163,7 @@ export default async function handler(request, response) {
       }
 
       try {
+        console.log('Appel à l\'API Groq pour traduction...');
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 
@@ -188,36 +189,27 @@ export default async function handler(request, response) {
           return;
         }
 
+        console.log('Streaming démarré depuis Groq...');
         // Stream les données directement
         const reader = groqResponse.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
 
         while (true) {
           const { value, done } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          
-          // Traiter toutes les lignes complètes
-          for (let i = 0; i < lines.length - 1; i++) {
-            const line = lines[i].trim();
-            if (line && line.startsWith('data: ')) {
-              // Transférer directement la ligne
-              response.write(`${line}\n\n`);
-            }
+          if (done) {
+            console.log('Streaming Groq terminé');
+            break;
           }
-          
-          // Garder la dernière ligne incomplète dans le buffer
-          buffer = lines[lines.length - 1];
-        }
 
-        // Traiter toute donnée restante dans le buffer
-        if (buffer.trim()) {
-          const line = buffer.trim();
-          if (line.startsWith('data: ')) {
-            response.write(`${line}\n\n`);
+          const chunk = decoder.decode(value, { stream: true });
+          console.log('Chunk Groq reçu:', chunk.substring(0, 100));
+          
+          // Écrire immédiatement chaque chunk reçu
+          response.write(chunk);
+          
+          // Forcer l'envoi immédiat
+          if (response.flush) {
+            response.flush();
           }
         }
 

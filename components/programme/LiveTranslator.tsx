@@ -92,6 +92,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         abortControllerRef.current = new AbortController();
         
         try {
+            console.log('Envoi de la requête de traduction...');
             const response = await fetch('/api/groq-proxy', {
                 method: 'POST',
                 headers: { 
@@ -108,26 +109,31 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             });
 
             if (!response.ok) {
+                console.error('Erreur de réponse:', response.status);
                 throw new Error(`Erreur serveur: ${response.status}`);
             }
 
             if (!response.body) {
+                console.error('Pas de body dans la réponse');
                 throw new Error("Pas de réponse du serveur");
             }
             
+            console.log('Début du streaming...');
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
             // Ajouter un saut de ligne avant la nouvelle traduction si il y a déjà du texte
-            if (translatedText.trim()) {
-                setTranslatedText(prev => prev + '\n\n');
-            }
+            setTranslatedText(prev => prev.trim() ? prev + '\n\n' : '');
 
             while (true) {
                 const { value, done } = await reader.read();
-                if (done) break;
+                if (done) {
+                    console.log('Stream terminé');
+                    break;
+                }
 
                 const chunk = decoder.decode(value, { stream: true });
+                console.log('Chunk reçu:', chunk.substring(0, 100) + '...');
                 const lines = chunk.split('\n');
 
                 for (const line of lines) {
@@ -135,7 +141,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                     
                     const data = line.substring(6).trim();
                     if (data === '[DONE]') {
-                        console.log('Traduction terminée');
+                        console.log('Traduction terminée - signal DONE reçu');
                         return;
                     }
                     
@@ -144,16 +150,18 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                         
                         // Gérer la détection de langue
                         if (parsed.detected_language && targetLang === 'auto') {
+                            console.log('Langue détectée:', parsed.detected_language);
                             setDetectedLanguage(parsed.detected_language);
                         }
                         
                         // Gérer le contenu de traduction
                         const contentDelta = parsed.choices?.[0]?.delta?.content;
                         if (contentDelta) {
+                            console.log('Nouveau contenu reçu:', contentDelta);
                             setTranslatedText(prev => prev + contentDelta);
                         }
                     } catch (parseError) {
-                        console.warn('Erreur parsing:', data);
+                        console.warn('Erreur parsing:', data, parseError);
                     }
                 }
             }
@@ -170,7 +178,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             setIsTranslating(false);
             abortControllerRef.current = null;
         }
-    }, [targetLang, translatedText]);
+    }, [targetLang]);
 
     // Gestion de la transcription avec debounce optimisé
     useEffect(() => {
