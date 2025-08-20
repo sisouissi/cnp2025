@@ -181,13 +181,14 @@ export default async function handler(request, response) {
           },
           body: JSON.stringify({ 
             messages, 
-            model, 
+            model,
             stream: true,
-            temperature: 0.1, // Très faible pour plus de cohérence
-            max_tokens: 200,   // Limite plus basse pour des réponses plus rapides
-            top_p: 0.9,
+            temperature: 0,      // Plus de cohérence
+            max_tokens: 150,     // Limite encore plus basse
+            top_p: 1,
             presence_penalty: 0,
-            frequency_penalty: 0
+            frequency_penalty: 0,
+            stop: null           // Pas de mots d'arrêt
           })
         });
 
