@@ -21,9 +21,6 @@ const detectLanguage = (text) => {
   if (/\b(el|la|los|las|un|una|y|o|que|con|en|para|por|de|es|son|tener|ser|estar|usted|nosotros)\b/i.test(text)) {
     return 'espagnol';
   }
-  if (/[\u0600-\u06FF]/.test(text)) {
-    return 'arabe';
-  }
   return 'français'; // Par défaut
 };
 
@@ -55,8 +52,7 @@ const createTranslationPrompt = (text, targetLang, detectedLang) => {
     const languageMap = {
       'fr': 'French',
       'en': 'English', 
-      'es': 'Spanish',
-      'ar': 'Arabic'
+      'es': 'Spanish'
     };
     
     const targetLanguage = languageMap[targetLang] || 'English';
