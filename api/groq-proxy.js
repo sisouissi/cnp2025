@@ -9,7 +9,8 @@ const sendJson = (response, statusCode, data) => {
   response.status(statusCode).json(data);
 };
 
-module.exports = async (request, response) => {
+// Utilisation de l'exportation par défaut pour la compatibilité avec les modules ES
+export default async function handler(request, response) {
   // Accepter uniquement les requêtes POST
   if (request.method !== 'POST') {
     return sendJson(response, 405, { error: 'Method Not Allowed' });
@@ -94,4 +95,4 @@ module.exports = async (request, response) => {
     const errorMessage = error instanceof Error ? error.message : 'Une erreur interne du serveur est survenue.';
     return sendJson(response, 500, { error: errorMessage });
   }
-};
+}
