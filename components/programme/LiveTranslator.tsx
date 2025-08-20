@@ -38,27 +38,76 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     const debounceTimerRef = useRef<number | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const isProcessingRef = useRef(false);
-
     const fullTranscript = finalTranscript + interimTranscript;
     
+    // Fonction utilitaire pour diviser le texte en segments
+    const splitTextIntoSegments = useCallback((text: string, maxLength: number): string[] => {
+        const segments: string[] = [];
+        let currentSegment = '';
+        
+        // Diviser le texte en phrases
+        const sentences = text.split(/(?<=[.!?])\s+/);
+        
+        for (const sentence of sentences) {
+            if (currentSegment.length + sentence.length <= maxLength) {
+                currentSegment += (currentSegment ? ' ' : '') + sentence;
+            } else {
+                if (currentSegment) segments.push(currentSegment);
+                currentSegment = sentence;
+            }
+        }
+        
+        if (currentSegment) segments.push(currentSegment);
+        return segments;
+    }, []);
+    
+    // Amélioration du défilement automatique
     const scrollToBottom = useCallback(() => {
         if (translatedPanelRef.current) {
-            const element = translatedPanelRef.current;
-            element.scrollTop = element.scrollHeight;
-            console.log('Scroll effectué - scrollTop:', element.scrollTop, 'scrollHeight:', element.scrollHeight);
+            // Utiliser requestAnimationFrame pour un défilement plus fluide
+            requestAnimationFrame(() => {
+                const element = translatedPanelRef.current;
+                if (element) {
+                    // S'assurer que le contenu est bien rendu avant de défiler
+                    const scrollHeight = element.scrollHeight;
+                    const height = element.clientHeight;
+                    const maxScrollTop = scrollHeight - height;
+                    
+                    // Défiler uniquement si ce n'est pas déjà en bas
+                    if (Math.abs(element.scrollTop - maxScrollTop) > 5) {
+                        element.scrollTop = maxScrollTop;
+                        console.log('📜 Scroll automatique effectué');
+                    }
+                }
+            });
         }
     }, []);
-
-    // Défilement forcé à chaque changement de texte
+    
+    // Gestion du défilement avec MutationObserver
     useEffect(() => {
         if (translatedText) {
-            // Utiliser setTimeout pour s'assurer que le DOM est mis à jour
-            setTimeout(() => {
+            // Utiliser MutationObserver pour réagir aux changements de contenu
+            const observer = new MutationObserver(() => {
                 scrollToBottom();
-            }, 50);
+            });
+            
+            if (translatedPanelRef.current) {
+                observer.observe(translatedPanelRef.current, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                });
+            }
+            
+            // Déclencher un premier défilement
+            scrollToBottom();
+            
+            return () => {
+                observer.disconnect();
+            };
         }
     }, [translatedText, scrollToBottom]);
-
+    
     // Fonction pour formater le texte en paragraphes
     const formatTextIntoParagraphs = useCallback((text: string) => {
         // Diviser par les points suivis d'espaces ou de nouvelles lignes
@@ -83,7 +132,8 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         
         return paragraphs;
     }, []);
-
+    
+    // Amélioration de la fonction de traduction
     const translateText = useCallback(async (text: string): Promise<void> => {
         if (!text.trim() || isProcessingRef.current) return;
         
@@ -92,12 +142,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         setIsTranslating(true);
         setIsPendingTranslation(false);
         setApiError(null);
-
-        // Ajouter immédiatement un indicateur que la traduction a commencé
-        if (translatedText.trim()) {
-            setTranslatedText(prev => prev + '\n\n');
-        }
-
+        
         // Annuler la requête précédente
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -107,97 +152,71 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         
         try {
             console.log('Envoi de la requête de traduction...');
-            const response = await fetch('/api/groq-proxy', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    type: 'translate',
-                    payload: { 
-                        text: text.trim(), 
-                        targetLang: targetLang
-                    }
-                }),
-                signal: abortControllerRef.current.signal
-            });
-
-            if (!response.ok) {
-                console.error('Erreur de réponse:', response.status);
-                throw new Error(`Erreur serveur: ${response.status}`);
-            }
-
-            if (!response.body) {
-                console.error('Pas de body dans la réponse');
-                throw new Error("Pas de réponse du serveur");
-            }
             
-            console.log('🎬 Début du streaming...');
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
+            // Diviser le texte en segments plus petits pour une traduction plus rapide
+            const segments = splitTextIntoSegments(text, 100); // 100 caractères par segment
+            let accumulatedTranslation = translatedText.trim() ? translatedText + '\n\n' : '';
             
-            // Ajouter un saut de ligne avant la nouvelle traduction si il y a déjà du texte
-            setTranslatedText(prev => prev.trim() ? prev + '\n\n' : '');
-            
-            // Test de scroll immédiat
-            setTimeout(() => {
-                if (translatedPanelRef.current) {
-                    translatedPanelRef.current.scrollTop = translatedPanelRef.current.scrollHeight;
-                    console.log('🔄 Scroll initial forcé');
-                }
-            }, 100);
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) {
-                    console.log('Stream terminé');
-                    break;
-                }
-
-                const chunk = decoder.decode(value, { stream: true });
-                console.log('Chunk reçu:', chunk.substring(0, 100) + '...');
-                const lines = chunk.split('\n');
-
-                for (const line of lines) {
-                    if (!line.trim() || !line.startsWith('data: ')) continue;
-                    
-                    const data = line.substring(6).trim();
-                    if (data === '[DONE]') {
-                        console.log('Traduction terminée - signal DONE reçu');
-                        return;
-                    }
-                    
-                    try {
-                        const parsed = JSON.parse(data);
-                        
-                        // Gérer la détection de langue
-                        if (parsed.detected_language && targetLang === 'auto') {
-                            console.log('Langue détectée:', parsed.detected_language);
-                            setDetectedLanguage(parsed.detected_language);
+            // Traiter les segments séquentiellement
+            for (const segment of segments) {
+                if (!segment.trim()) continue;
+                
+                const response = await fetch('/api/groq-proxy', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: 'translate',
+                        payload: { 
+                            text: segment.trim(), 
+                            targetLang: targetLang
                         }
+                    }),
+                    signal: abortControllerRef.current.signal
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Erreur serveur: ${response.status}`);
+                }
+                
+                if (!response.body) {
+                    throw new Error("Pas de réponse du serveur");
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let segmentTranslation = '';
+                
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (!line.trim() || !line.startsWith('data: ')) continue;
                         
-                        // Gérer le contenu de traduction
-                        const contentDelta = parsed.choices?.[0]?.delta?.content;
-                        if (contentDelta) {
-                            console.log('✅ Contenu reçu:', contentDelta);
-                            setTranslatedText(prev => {
-                                const newText = prev + contentDelta;
-                                // Scroll immédiat à chaque nouveau contenu
-                                setTimeout(() => {
-                                    if (translatedPanelRef.current) {
-                                        translatedPanelRef.current.scrollTop = translatedPanelRef.current.scrollHeight;
-                                        console.log('📜 Scroll automatique effectué');
-                                    }
-                                }, 0);
-                                return newText;
-                            });
-                        }
-                    } catch (parseError) {
-                        // Ignorer silencieusement les erreurs de parsing des chunks incomplets
-                        if (!data.includes('"id"')) {
-                            console.warn('Chunk incomplet ignoré:', data.substring(0, 50));
-                        } else {
-                            console.warn('Erreur parsing chunk complet:', data, parseError);
+                        const data = line.substring(6).trim();
+                        if (data === '[DONE]') break;
+                        
+                        try {
+                            const parsed = JSON.parse(data);
+                            
+                            if (parsed.detected_language && targetLang === 'auto') {
+                                setDetectedLanguage(parsed.detected_language);
+                            }
+                            
+                            const contentDelta = parsed.choices?.[0]?.delta?.content;
+                            if (contentDelta) {
+                                segmentTranslation += contentDelta;
+                                accumulatedTranslation += contentDelta;
+                                setTranslatedText(accumulatedTranslation);
+                                scrollToBottom(); // Appel direct à la fonction de scroll
+                            }
+                        } catch (parseError) {
+                            console.warn('Erreur parsing chunk:', parseError);
                         }
                     }
                 }
@@ -210,7 +229,6 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             }
             console.error('Erreur traduction:', error);
             
-            // Afficher une erreur plus explicite
             let errorMessage = "Erreur de traduction";
             if (error.message.includes('500')) {
                 errorMessage = "Erreur serveur - Vérifiez la configuration API";
@@ -222,11 +240,9 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             
             setApiError(errorMessage);
             
-            // Réessayer automatiquement après 3 secondes pour les erreurs temporaires
             if (error.message.includes('500') || error.message.includes('network')) {
                 setIsRetrying(true);
                 setTimeout(() => {
-                    console.log('Tentative de nouvelle traduction...');
                     setApiError(null);
                     setIsRetrying(false);
                     translateText(text);
@@ -237,8 +253,8 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             setIsTranslating(false);
             abortControllerRef.current = null;
         }
-    }, [targetLang]);
-
+    }, [targetLang, translatedText, scrollToBottom, splitTextIntoSegments]);
+    
     // Gestion de la transcription avec debounce optimisé
     useEffect(() => {
         if (debounceTimerRef.current) {
@@ -247,30 +263,37 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         
         const processTranscript = () => {
             const newText = fullTranscript.substring(sentTranscriptRef.current.length).trim();
-            if (newText.length > 5) { // Seuil minimum pour éviter les fragments trop courts
+            // Réduire le seuil minimum pour une réactivité accrue
+            if (newText.length > 0) { 
                 console.log('Nouveau texte à traduire:', newText);
                 sentTranscriptRef.current = fullTranscript;
                 translateText(newText);
             }
         };
-
+        
         if (isListening && fullTranscript) {
-            // Debounce de 1 seconde pendant l'écoute
-            debounceTimerRef.current = window.setTimeout(processTranscript, 1000);
+            // Utiliser un délai adaptatif : plus court au début, puis plus long
+            const isFirstTranslation = sentTranscriptRef.current.length === 0;
+            const debounceDelay = isFirstTranslation ? 300 : 1000;
+            
+            debounceTimerRef.current = window.setTimeout(processTranscript, debounceDelay);
+            
+            // Pour la première traduction, ajouter un indicateur visuel
+            if (sentTranscriptRef.current.length === 0) {
+                setIsPendingTranslation(true);
+            }
         } else if (!isListening && fullTranscript.length > sentTranscriptRef.current.length) {
-            // Traitement immédiat quand l'écoute s'arrête
             setIsPendingTranslation(false);
             processTranscript();
         }
-
+        
         return () => {
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);
-                setIsPendingTranslation(false);
             }
         };
     }, [fullTranscript, isListening, translateText]);
-
+    
     const handleToggleListening = useCallback(() => {
         if (isListening) {
             stopListening();
@@ -289,7 +312,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             startListening();
         }
     }, [isListening, startListening, stopListening]);
-
+    
     // Nettoyage à la destruction du composant
     useEffect(() => {
         return () => {
