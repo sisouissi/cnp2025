@@ -120,17 +120,21 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
-            // Initialiser un nouveau paragraphe
+            // Créer un nouveau paragraphe pour chaque traduction
+            const newParagraphIndex = translatedParagraphs.length;
             setCurrentParagraph('');
 
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) {
-                    // Finaliser le paragraphe courant quand le streaming se termine
-                    if (currentParagraph.trim()) {
-                        setTranslatedParagraphs(prev => [...prev, currentParagraph.trim()]);
-                        setCurrentParagraph('');
-                    }
+                    // Finaliser le paragraphe courant
+                    setCurrentParagraph(prev => {
+                        if (prev.trim()) {
+                            setTranslatedParagraphs(existing => [...existing, prev.trim()]);
+                            return '';
+                        }
+                        return prev;
+                    });
                     break;
                 }
 
@@ -167,16 +171,44 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                             setCurrentParagraph(prev => {
                                 const newText = prev + contentDelta;
                                 
-                                // Vérifier si on a une phrase complète (se termine par ., !, ?)
-                                if (/[.!?]\s*$/.test(newText.trim())) {
-                                    // Compter les phrases dans le paragraphe actuel
-                                    const sentences = newText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-                                    
-                                    // Si on a 2-3 phrases, créer un nouveau paragraphe
-                                    if (sentences.length >= 2) {
-                                        setTranslatedParagraphs(existing => [...existing, newText.trim()]);
-                                        return ''; // Nouveau paragraphe
+                                // Vérifier s'il y a des sauts de ligne ou des paragraphes naturels
+                                if (contentDelta.includes('\n\n') || contentDelta.includes('\n')) {
+                                    // Diviser par les doubles sauts de ligne
+                                    const parts = newText.split(/\n\s*\n/);
+                                    if (parts.length > 1) {
+                                        // Ajouter les paragraphes complets
+                                        for (let i = 0; i < parts.length - 1; i++) {
+                                            if (parts[i].trim()) {
+                                                setTranslatedParagraphs(existing => [...existing, parts[i].trim()]);
+                                            }
+                                        }
+                                        // Garder la dernière partie comme paragraphe courant
+                                        return parts[parts.length - 1] || '';
                                     }
+                                }
+                                
+                                // Diviser par phrases longues (plus de 150 caractères)
+                                if (newText.length > 150 && /[.!?]\s/.test(newText)) {
+                                    const sentences = newText.split(/([.!?]\s+)/).filter(s => s.trim());
+                                    let accumulatedText = '';
+                                    let remainingText = '';
+                                    
+                                    for (let i = 0; i < sentences.length; i += 2) {
+                                        const sentence = sentences[i] + (sentences[i + 1] || '');
+                                        accumulatedText += sentence;
+                                        
+                                        // Si on dépasse 2 phrases ou 150 caractères, créer un paragraphe
+                                        if (accumulatedText.split(/[.!?]/).length > 3 || accumulatedText.length > 150) {
+                                            if (accumulatedText.trim()) {
+                                                setTranslatedParagraphs(existing => [...existing, accumulatedText.trim()]);
+                                            }
+                                            accumulatedText = '';
+                                            remainingText = sentences.slice(i + 2).join('');
+                                            break;
+                                        }
+                                    }
+                                    
+                                    return remainingText || accumulatedText;
                                 }
                                 
                                 return newText;
@@ -200,7 +232,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             setIsTranslating(false);
             abortControllerRef.current = null;
         }
-    }, [targetLang, formatTextIntoParagraphs]);
+    }, [targetLang, translatedParagraphs.length]);
 
     // Gestion de la transcription avec debounce optimisé
     useEffect(() => {
@@ -241,7 +273,6 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             }
         } else {
             // Reset de l'état
-            setTranslatedText('');
             setTranslatedParagraphs([]);
             setCurrentParagraph('');
             setDetectedLanguage(null);

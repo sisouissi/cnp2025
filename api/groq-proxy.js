@@ -58,7 +58,11 @@ const createTranslationPrompt = (text, targetLang, detectedLang) => {
     const targetLanguage = languageMap[targetLang] || 'English';
     
     return {
-      system: `You are a professional translator. Translate the following text to ${targetLanguage}. Provide only the translation, no explanations.`,
+      system: `You are a professional translator. Translate the following text to ${targetLanguage}. 
+- Provide only the translation, no explanations
+- Structure your translation in clear paragraphs when the content is long
+- Add line breaks between different ideas or topics
+- Keep the natural flow and readability of the text`,
       user: text,
       targetLanguage: targetLanguage.toLowerCase()
     };
