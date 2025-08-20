@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Tab } from '../../App';
-import { Home, CalendarDays, CalendarCheck, Users, Info, FileText } from 'lucide-react';
+import { Home, CalendarDays, CalendarCheck, Users, Info, FileText, Users2 } from 'lucide-react';
 
 interface MobileNavBarProps {
   activeTab: Tab;
@@ -29,12 +29,13 @@ const NavItem: React.FC<{
 
 const MobileNavBar: React.FC<MobileNavBarProps> = ({ activeTab, setActiveTab }) => {
   const navItems = [
-    { key: 'home', label: 'Accueil', icon: <Home size={24} /> },
-    { key: 'programme', label: 'Programme', icon: <CalendarDays size={24} /> },
-    { key: 'agenda', label: 'Agenda', icon: <CalendarCheck size={24} /> },
-    { key: 'speakers', label: 'Orateurs', icon: <Users size={24} /> },
-    { key: 'submission', label: 'Soumissions', icon: <FileText size={24} /> },
-    { key: 'info', label: 'Infos', icon: <Info size={24} /> },
+    { key: 'home', label: 'Accueil', icon: <Home size={22} /> },
+    { key: 'programme', label: 'Programme', icon: <CalendarDays size={22} /> },
+    { key: 'agenda', label: 'Agenda', icon: <CalendarCheck size={22} /> },
+    { key: 'speakers', label: 'Orateurs', icon: <Users size={22} /> },
+    { key: 'committee', label: 'Comité', icon: <Users2 size={22} /> },
+    { key: 'submission', label: 'Soumissions', icon: <FileText size={22} /> },
+    { key: 'info', label: 'Infos', icon: <Info size={22} /> },
   ];
 
   return (

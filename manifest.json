@@ -1,0 +1,21 @@
+{
+  "name": "CNP 2025 Conference App",
+  "short_name": "CNP 2025",
+  "description": "The official Progressive Web App for the 29th National Congress of Pneumology (CNP 2025). Browse the schedule, create your personal agenda, and get all the event information right at your fingertips.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#033238",
+  "icons": [
+    {
+      "src": "icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

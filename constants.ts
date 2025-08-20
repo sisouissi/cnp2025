@@ -1,5 +1,56 @@
 import type { Session, Day } from './types';
 
+export interface ScientificCommitteeMember {
+  name: string;
+  role: 'Président' | 'Membre';
+}
+
+export const SCIENTIFIC_COMMITTEE_DATA: ScientificCommitteeMember[] = [
+  { name: 'Fatma Chermiti', role: 'Président' },
+  { name: 'Agnès Hamzaoui', role: 'Membre' },
+  { name: 'Ahmed Ben Saad', role: 'Membre' },
+  { name: 'Ali Ben Kheder', role: 'Membre' },
+  { name: 'Béchir Louzir', role: 'Membre' },
+  { name: 'Besma Hamdi', role: 'Membre' },
+  { name: 'Besma Ourari', role: 'Membre' },
+  { name: 'Chaima Habouria', role: 'Membre' },
+  { name: 'Chirine Moussa', role: 'Membre' },
+  { name: 'Ferdaous Yangui', role: 'Membre' },
+  { name: 'Hafaoua Daghfous', role: 'Membre' },
+  { name: 'Haifa Zaibi', role: 'Membre' },
+  { name: 'Hajer Abdelgahffar', role: 'Membre' },
+  { name: 'Hamida Kwas', role: 'Membre' },
+  { name: 'Hana Mrassi', role: 'Membre' },
+  { name: 'Hanène Smadhi', role: 'Membre' },
+  { name: 'Hela Cherif', role: 'Membre' },
+  { name: 'Hela Kammoun', role: 'Membre' },
+  { name: 'Houda Snène', role: 'Membre' },
+  { name: 'Imen Gargouri', role: 'Membre' },
+  { name: 'Ines Moussa', role: 'Membre' },
+  { name: 'Islem Mejri', role: 'Membre' },
+  { name: 'Jalloul Daghfous', role: 'Membre' },
+  { name: 'Jihène Ben Ammar', role: 'Membre' },
+  { name: 'Leila Fekih', role: 'Membre' },
+  { name: 'Leila Gharbi', role: 'Membre' },
+  { name: 'Lilia Masmoudi', role: 'Membre' },
+  { name: 'Meriem Mjid', role: 'Membre' },
+  { name: 'Nada Gader', role: 'Membre' },
+  { name: 'Nadia Mehiri', role: 'Membre' },
+  { name: 'Nadia Moussa', role: 'Membre' },
+  { name: 'Najla Bahloul', role: 'Membre' },
+  { name: 'Narjes Abid', role: 'Membre' },
+  { name: 'Rania Kadoussi', role: 'Membre' },
+  { name: 'Sabrine Louhaichi', role: 'Membre' },
+  { name: 'Salsabil Daboussi', role: 'Membre' },
+  { name: 'Samira Aouadi', role: 'Membre' },
+  { name: 'Samira Mhamdi', role: 'Membre' },
+  { name: 'Samy kammoun', role: 'Membre' },
+  { name: 'Sonia Maalej', role: 'Membre' },
+  { name: 'Soumaya Bouchereb', role: 'Membre' },
+  { name: 'Rahma Gargouri', role: 'Membre' }
+];
+
+
 export const SESSIONS_DATA: Session[] = [
     // Jeudi 27 novembre
     {
@@ -19,7 +70,7 @@ export const SESSIONS_DATA: Session[] = [
       title: 'Atelier N°1: Bilan allergologique devant une allergie respiratoire. Niveau 1.',
       startTime: new Date(2025, 10, 27, 9, 0),
       endTime: new Date(2025, 10, 27, 10, 30),
-      location: 'Petit Salon 1',
+      location: 'Petit Salon',
       speakers: [
         { name: 'Soumaya Ben Saad', specialty: 'Pneumologie' },
         { name: 'Rahma Gargouri', specialty: 'Pneumologie' }
@@ -86,7 +137,7 @@ export const SESSIONS_DATA: Session[] = [
       title: 'Atelier N°1: Bilan allergologique devant une allergie respiratoire. Niveau 2.',
       startTime: new Date(2025, 10, 27, 11, 0),
       endTime: new Date(2025, 10, 27, 12, 30),
-      location: 'Petit Salon 1',
+      location: 'Petit Salon',
       speakers: [
         { name: 'Soumaya Ben Saad', specialty: 'Pneumologie' },
         { name: 'Rahma Gargouri', specialty: 'Pneumologie' }
@@ -670,4 +721,35 @@ export const THEME_COLORS: Record<string, string> = {
 
 export const getThemeColor = (themeOrType: string): string => {
     return THEME_COLORS[themeOrType] || 'bg-slate-500';
+};
+
+export const THEME_GRADIENTS: Record<string, string> = {
+    'BPCO': 'from-[#033238] to-[#054c55]',
+    'Asthme': 'from-sky-600 to-sky-500',
+    'Cancer': 'from-rose-600 to-rose-500',
+    'PID': 'from-purple-600 to-purple-500',
+    'Sommeil': 'from-indigo-600 to-indigo-500',
+    'IA': 'from-amber-500 to-amber-400',
+    'Infections': 'from-pink-600 to-pink-500',
+    'Allergies': 'from-[#033238] to-[#054c55]',
+    'Pollution': 'from-slate-500 to-slate-400',
+    'Actualités': 'from-orange-500 to-orange-400',
+    'Urgences': 'from-red-600 to-red-500',
+    'VNI': 'from-cyan-500 to-cyan-400',
+    'Prix': 'from-amber-400 to-yellow-300',
+    'Administratif': 'from-slate-600 to-slate-500',
+    'inaugurale': 'from-rose-500 to-rose-400',
+    'symposium': 'from-[#033238] to-[#054c55]',
+    'atelier': 'from-violet-500 to-violet-400',
+    'séance': 'from-blue-600 to-blue-500',
+    'Pause': 'from-slate-400 to-slate-300',
+    'Symposium': 'from-[#033238] to-[#054c55]',
+    'Techniques': 'from-fuchsia-500 to-fuchsia-400',
+    'accueil': 'from-sky-500 to-sky-400',
+    'cérémonie': 'from-amber-400 to-yellow-300',
+    'assemblée': 'from-slate-700 to-slate-600'
+};
+
+export const getThemeGradient = (themeOrType: string): string => {
+    return THEME_GRADIENTS[themeOrType] || 'from-slate-500 to-slate-400';
 };

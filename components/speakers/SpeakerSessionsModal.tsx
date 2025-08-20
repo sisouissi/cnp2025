@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { Speaker, Session } from '../../types';
 import { SESSIONS_DATA, getThemeColor } from '../../constants';
 import { X, Clock, MapPin } from 'lucide-react';
+import { useAgenda } from '../../context/AgendaContext';
 
 interface SpeakerSessionsModalProps {
   speaker: Speaker;
@@ -9,11 +10,18 @@ interface SpeakerSessionsModalProps {
 }
 
 const SpeakerSessionsModal: React.FC<SpeakerSessionsModalProps> = ({ speaker, onClose }) => {
+  const { showSessionModal } = useAgenda();
+  
   const speakerSessions = useMemo(() => {
     return SESSIONS_DATA
       .filter(session => session.speakers.some(s => s.name === speaker.name))
       .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
   }, [speaker.name]);
+
+  const handleSessionClick = (session: Session) => {
+    showSessionModal(session);
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={onClose}>
@@ -40,9 +48,10 @@ const SpeakerSessionsModal: React.FC<SpeakerSessionsModalProps> = ({ speaker, on
             {speakerSessions.length > 0 ? (
                 <div className="space-y-4">
                     {speakerSessions.map(session => (
-                        <div 
-                            key={session.id} 
-                            className={`p-4 rounded-lg border-l-4 ${getThemeColor(session.theme).replace('bg-','border-')} bg-slate-50`}
+                        <button 
+                            key={session.id}
+                            onClick={() => handleSessionClick(session)}
+                            className={`w-full text-left p-4 rounded-lg border-l-4 ${getThemeColor(session.theme).replace('bg-','border-')} bg-slate-50 hover:bg-slate-100 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#68A0A8]`}
                         >
                             <p className="font-semibold text-slate-800">{session.title}</p>
                             <div className="text-sm text-slate-600 mt-2 space-y-1.5">
@@ -55,7 +64,7 @@ const SpeakerSessionsModal: React.FC<SpeakerSessionsModalProps> = ({ speaker, on
                                     {session.location}
                                 </p>
                             </div>
-                        </div>
+                        </button>
                     ))}
                 </div>
             ) : (

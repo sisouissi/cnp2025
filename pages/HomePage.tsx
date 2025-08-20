@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Tab } from '../App';
 import Footer from '../components/layout/Footer';
@@ -5,14 +6,17 @@ import CountdownDisplay from '../components/ui/CountdownDisplay';
 import SearchResults from '../components/home/SearchResults';
 import { SESSIONS_DATA } from '../constants';
 import type { Session } from '../types';
-import { ArrowRight, CheckCircle2, Search } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Search, Download, Calendar, MapPin, Phone, Mail, FileText } from 'lucide-react';
+import { usePWAInstall } from '../context/PWAInstallContext';
 
 interface HomePageProps {
   setActiveTab: (tab: Tab) => void;
+  onSessionSelect: (session: Session) => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ setActiveTab }) => {
+const HomePage: React.FC<HomePageProps> = ({ setActiveTab, onSessionSelect }) => {
     const [searchQuery, setSearchQuery] = useState('');
+    const { canInstall, install } = usePWAInstall();
 
     const filteredSessions = useMemo(() => {
         if (!searchQuery) return [];
@@ -27,7 +31,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActiveTab }) => {
     }, [searchQuery]);
 
     const handleSessionClick = (session: Session) => {
-        setActiveTab('programme');
+        onSessionSelect(session);
     };
 
     return (
@@ -71,7 +75,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActiveTab }) => {
 
               <CountdownDisplay />
 
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
                 <button
                   onClick={() => setActiveTab('programme')}
                   className="flex items-center justify-center gap-2 bg-[#033238] text-white px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:bg-[#02262B] transition-all duration-300 transform hover:scale-105"
@@ -85,6 +89,15 @@ const HomePage: React.FC<HomePageProps> = ({ setActiveTab }) => {
                 >
                   S'inscrire
                 </button>
+                {canInstall && (
+                  <button
+                    onClick={install}
+                    className="flex items-center justify-center gap-2 bg-green-600 text-white px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:bg-green-700 transition-all duration-300 transform hover:scale-105"
+                  >
+                    <Download size={20} />
+                    <span className="font-semibold">Installer l'app</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -102,29 +115,76 @@ const HomePage: React.FC<HomePageProps> = ({ setActiveTab }) => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white rounded-2xl shadow-lg p-8">
-                 <h2 className="text-3xl font-bold text-slate-900 mb-6">Autres Thèmes</h2>
-                <ul className="space-y-4">
-                {[
-                    'Infections respiratoires', 'BPCO, Asthme et allergies', 'Cancer bronchopulmonaire',
-                    'Pneumopathies interstitielles diffuses', 'Pathologies du sommeil et VNI', 'Intelligence artificielle en pneumologie'
-                ].map((theme, index) => (
-                    <li key={index} className="flex items-center">
-                    <CheckCircle2 className="w-6 h-6 text-[#033238] mr-4 flex-shrink-0" />
-                    <span className="text-slate-700 text-lg">{theme}</span>
+                <h2 className="text-3xl font-bold text-slate-900 mb-6">Informations Clés</h2>
+                <ul className="space-y-5">
+                    <li className="flex items-start">
+                        <div className="bg-slate-100 p-3 rounded-full mr-4">
+                            <Calendar className="w-6 h-6 text-[#033238]" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-slate-800">Dates du Congrès</h3>
+                            <p className="text-slate-600">27 - 29 Novembre 2025</p>
+                        </div>
                     </li>
-                ))}
+                    <li className="flex items-start">
+                        <div className="bg-slate-100 p-3 rounded-full mr-4">
+                            <MapPin className="w-6 h-6 text-[#033238]" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-slate-800">Lieu</h3>
+                            <p className="text-slate-600">Hôtel Movenpick, Les Berges du Lac 1, Tunis</p>
+                        </div>
+                    </li>
+                    <li className="flex items-start">
+                        <div className="bg-slate-100 p-3 rounded-full mr-4">
+                            <CheckCircle2 className="w-6 h-6 text-[#033238]" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-slate-800">Autres thèmes abordés</h3>
+                            <p className="text-slate-600">Infections, BPCO, Asthme, Cancer, PID, Sommeil, VNI, IA...</p>
+                        </div>
+                    </li>
                 </ul>
             </div>
           <div className="bg-white rounded-2xl shadow-lg p-8">
-            <h2 className="text-3xl font-bold text-slate-900 mb-6">Appel à Abstracts</h2>
-            <div className="bg-slate-100 rounded-xl p-6 border border-slate-200 space-y-4">
-                <div>
-                    <h3 className="text-lg font-semibold text-slate-800">Soumission en ligne exclusive</h3>
-                    <p className="text-slate-600">Dernier délai de soumission le dimanche 28 septembre 2025</p>
-                </div>
-                <div>
-                    <h3 className="text-lg font-semibold text-slate-800">Contact</h3>
-                    <p className="text-slate-600">Dr Sonia Maalej - Tél : +216 98 318 199</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-6">Contact & Soumissions</h2>
+            <ul className="space-y-5 mb-6">
+                <li className="flex items-start">
+                    <div className="bg-slate-100 p-3 rounded-full mr-4">
+                        <Phone className="w-6 h-6 text-[#033238]" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-slate-800">Téléphones</h3>
+                        <p className="text-slate-600">Dr Sonia Maalej: +216 98 318 199</p>
+                        <p className="text-slate-600">Secrétariat: +216 98 539 050</p>
+                    </div>
+                </li>
+                <li className="flex items-start">
+                    <div className="bg-slate-100 p-3 rounded-full mr-4">
+                        <Mail className="w-6 h-6 text-[#033238]" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-slate-800">Email</h3>
+                        <p className="text-slate-600">info@stmra.org</p>
+                    </div>
+                </li>
+            </ul>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <div className="flex items-start">
+                    <div className="bg-slate-100 p-3 rounded-full mr-4">
+                        <FileText className="w-6 h-6 text-[#033238]" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-slate-800">Appel à Abstracts</h3>
+                        <p className="text-slate-600 text-sm mb-3">Dernier délai de soumission le dimanche 28 septembre 2025.</p>
+                        <button
+                            onClick={() => setActiveTab('submission')}
+                            className="flex items-center justify-center gap-2 bg-[#033238] text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:bg-[#02262B] transition-all duration-300 text-sm font-semibold"
+                        >
+                            <span>Soumettre un travail</span>
+                            <ArrowRight size={16} />
+                        </button>
+                    </div>
                 </div>
             </div>
           </div>

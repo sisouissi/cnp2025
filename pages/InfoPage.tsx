@@ -7,9 +7,9 @@ interface InfoPageProps {
 }
 
 const InfoCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-    <div>
+    <div className="h-full flex flex-col">
         <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tighter">{title}</h2>
-        <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
+        <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 flex-grow">
             {children}
         </div>
     </div>
@@ -58,28 +58,30 @@ const InfoPage: React.FC<InfoPageProps> = ({ setActiveTab }) => {
             </InfoCard>
           </div>
         </div>
-        <div className="mt-8">
-            <InfoCard title="Lieu du Congrès">
-                <div className="rounded-lg overflow-hidden">
-                    <iframe
-                        src="https://maps.google.com/maps?q=Movenpick%20Hotel%20du%20Lac%20Tunis&t=&z=15&ie=UTF8&iwloc=&output=embed"
-                        className="w-full h-80 border-0"
-                        allowFullScreen
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        title="Carte du lieu du congrès : Hôtel Movenpick, Les Berges du Lac, Tunis"
-                    ></iframe>
-                </div>
-            </InfoCard>
-        </div>
-        <div className="mt-8">
-            <InfoCard title="Contact">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center md:text-left">
-                    <div><h3 className="font-semibold text-slate-900 mb-1">Dr Sonia Maalej</h3><p className="text-slate-600">+216 98 318 199</p></div>
-                    <div><h3 className="font-semibold text-slate-900 mb-1">Secrétariat</h3><p className="text-slate-600">Mme Essia Chebbi: +216 98 539 050</p></div>
-                    <div><h3 className="font-semibold text-slate-900 mb-1">Email & Site Web</h3><p className="text-slate-600">info@stmra.org / www.stmra.org</p></div>
-                </div>
-            </InfoCard>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mt-8">
+            <div className="lg:col-span-3">
+                <InfoCard title="Lieu du Congrès">
+                    <div className="rounded-lg overflow-hidden h-full">
+                        <iframe
+                            src="https://maps.google.com/maps?q=Movenpick%20Hotel%20du%20Lac%20Tunis&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                            className="w-full h-full min-h-[320px] border-0"
+                            allowFullScreen
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            title="Carte du lieu du congrès : Hôtel Movenpick, Les Berges du Lac, Tunis"
+                        ></iframe>
+                    </div>
+                </InfoCard>
+            </div>
+            <div className="lg:col-span-2">
+                <InfoCard title="Contact">
+                    <div className="space-y-6">
+                        <div><h3 className="font-semibold text-slate-900 mb-1">Dr Sonia Maalej</h3><p className="text-slate-600">+216 98 318 199</p></div>
+                        <div><h3 className="font-semibold text-slate-900 mb-1">Secrétariat</h3><p className="text-slate-600">Mme Essia Chebbi: +216 98 539 050</p></div>
+                        <div><h3 className="font-semibold text-slate-900 mb-1">Email & Site Web</h3><p className="text-slate-600">info@stmra.org / www.stmra.org</p></div>
+                    </div>
+                </InfoCard>
+            </div>
         </div>
       </main>
     </div>

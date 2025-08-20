@@ -1,13 +1,13 @@
 import React from 'react';
 import type { Session } from '../../types';
-import { getThemeColor } from '../../constants';
+import { getThemeGradient } from '../../constants';
 
 interface SchedulerViewProps {
   sessions: Session[];
   onSessionClick: (session: Session) => void;
 }
 
-const LOCATIONS = ['Grand Salon 1', 'Grand Salon 2', 'Petit Salon', 'Petit Salon 1', 'Salon Carré', 'Salon de délégation 3', 'Salle de restaurant'];
+const LOCATIONS = ['Grand Salon 1', 'Grand Salon 2', 'Petit Salon', 'Salon Carré', 'Salon de délégation 3', 'Salle de restaurant'];
 
 const generateTimeSlots = (startHour: number, endHour: number, intervalMinutes: number): string[] => {
     const slots = [];
@@ -27,6 +27,20 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ sessions, onSessionClick 
     
     const renderedSlots = new Set<string>();
 
+    const day = sessions.length > 0 ? sessions[0].startTime.getDate() : null;
+
+    let orderedLocations = [...LOCATIONS];
+    if (day === 28 || day === 29) { // Friday or Saturday
+        const priorityOrder = ['Grand Salon 2', 'Petit Salon'];
+        // Filter out 'Grand Salon 1' for Friday and Saturday
+        const availableLocations = LOCATIONS.filter(loc => loc !== 'Grand Salon 1');
+        
+        orderedLocations = [
+            ...priorityOrder,
+            ...availableLocations.filter(loc => !priorityOrder.includes(loc))
+        ];
+    }
+
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -34,7 +48,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ sessions, onSessionClick 
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 w-24 sticky left-0 bg-gray-50 z-10">Horaire</th>
-                            {LOCATIONS.map(location => (
+                            {orderedLocations.map(location => (
                                 <th key={location} className="px-4 py-3 text-left text-sm font-semibold text-gray-700 min-w-[200px]">
                                     {location}
                                 </th>
@@ -50,7 +64,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ sessions, onSessionClick 
                                     <td className="px-4 py-2 text-sm text-gray-400 w-24 sticky left-0 bg-white z-10"></td>
                                 )}
                                 
-                                {LOCATIONS.map(location => {
+                                {orderedLocations.map(location => {
                                     const session = sessions.find(s => {
                                         const sessionStart = s.startTime;
                                         const [hour, minute] = time.split(':').map(Number);
@@ -67,7 +81,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ sessions, onSessionClick 
                                         return (
                                             <td key={`${location}-${time}`} rowSpan={rowSpan} className="p-0 align-top border-l border-gray-100 relative">
                                                 <div
-                                                    className={`absolute inset-0 m-px p-2 rounded-lg text-white text-sm ${getThemeColor(session.theme)} cursor-pointer hover:opacity-90 transition-opacity flex flex-col justify-between overflow-hidden`}
+                                                    className={`absolute inset-0 m-1 p-2 rounded-lg text-white text-sm bg-gradient-to-br ${getThemeGradient(session.theme)} shadow-lg cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between overflow-hidden`}
                                                     onClick={() => onSessionClick(session)}
                                                 >
                                                     <div className="font-semibold">{session.title}</div>

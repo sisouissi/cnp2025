@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Tab } from '../App';
 import type { Filters, Session } from '../types';
 import { SESSIONS_DATA, DAYS, THEMES, TYPES } from '../constants';
@@ -10,14 +10,27 @@ import { SlidersHorizontal, List, GanttChartSquare, X } from 'lucide-react';
 
 interface ProgrammePageProps {
   setActiveTab: (tab: Tab) => void;
+  searchSelectedSessionId: string | null;
+  clearSearchSelection: () => void;
 }
 
-const ProgrammePage: React.FC<ProgrammePageProps> = ({ setActiveTab }) => {
+const ProgrammePage: React.FC<ProgrammePageProps> = ({ setActiveTab, searchSelectedSessionId, clearSearchSelection }) => {
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [filters, setFilters] = useState<Filters>({ theme: '', type: '', speaker: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'scheduler' | 'list'>('list');
+  const [showFilters, setShowFilters] = useState(false);
   const { showSessionModal } = useAgenda();
+
+  useEffect(() => {
+    if (searchSelectedSessionId) {
+      const session = SESSIONS_DATA.find(s => s.id === searchSelectedSessionId);
+      if (session) {
+        showSessionModal(session);
+      }
+      clearSearchSelection();
+    }
+  }, [searchSelectedSessionId, showSessionModal, clearSearchSelection]);
 
   const handleDaySelection = (dayKey: string) => {
     setSelectedDay(dayKey);
@@ -36,9 +49,11 @@ const ProgrammePage: React.FC<ProgrammePageProps> = ({ setActiveTab }) => {
       sessions = SESSIONS_DATA.filter(session => session.startTime.getDate() === parseInt(selectedDay));
     }
 
+    let sessionsToFilter = sessions;
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return sessions.filter(session => 
+      sessionsToFilter = sessionsToFilter.filter(session => 
         session.title.toLowerCase().includes(query) ||
         session.theme.toLowerCase().includes(query) ||
         session.type.toLowerCase().includes(query) ||
@@ -46,7 +61,7 @@ const ProgrammePage: React.FC<ProgrammePageProps> = ({ setActiveTab }) => {
       );
     }
 
-    return sessions.filter(session => {
+    return sessionsToFilter.filter(session => {
       const matchesTheme = !filters.theme || session.theme === filters.theme;
       const matchesType = !filters.type || session.type === filters.type;
       const matchesSpeaker = !filters.speaker || session.speakers.some(speaker => speaker.name.toLowerCase().includes(filters.speaker.toLowerCase()));
@@ -60,6 +75,7 @@ const ProgrammePage: React.FC<ProgrammePageProps> = ({ setActiveTab }) => {
   }
 
   const hasActiveFilters = filters.theme || filters.type || filters.speaker || searchQuery;
+  const hasDropdownFilters = filters.theme || filters.type || filters.speaker;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -94,8 +110,8 @@ const ProgrammePage: React.FC<ProgrammePageProps> = ({ setActiveTab }) => {
         </div>
       
         <div className="bg-white/70 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-200 mb-6 sticky top-20 z-30">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-center">
-                <div className="lg:col-span-3">
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="flex-grow min-w-0" style={{ flexBasis: '400px' }}>
                      <input
                         type="text"
                         placeholder="Rechercher une session, thème, orateur..."
@@ -104,34 +120,56 @@ const ProgrammePage: React.FC<ProgrammePageProps> = ({ setActiveTab }) => {
                         className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-[#68A0A8] focus:border-[#68A0A8]"
                     />
                 </div>
-                <div className="flex items-center space-x-2">
-                     <button
-                        onClick={() => setViewMode('scheduler')}
-                        disabled={selectedDay === 'all'}
-                        className={`w-full flex justify-center items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        viewMode === 'scheduler' ? 'bg-[#033238] text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
-                        } ${selectedDay === 'all' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        <GanttChartSquare size={16}/> Planning
-                    </button>
+                
+                <div className="flex items-center gap-2 flex-wrap">
                     <button
-                        onClick={() => setViewMode('list')}
-                        className={`w-full flex justify-center items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        viewMode === 'list' ? 'bg-[#033238] text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            showFilters || hasDropdownFilters ? 'bg-[#033238] text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
                         }`}
                     >
-                       <List size={16}/> Liste
+                        <SlidersHorizontal size={16}/>
+                        <span>Filtres</span>
                     </button>
+
+                    <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setViewMode('scheduler')}
+                            disabled={selectedDay === 'all'}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                viewMode === 'scheduler' ? 'bg-white text-[#033238] shadow-sm' : 'text-slate-600 hover:bg-white/60'
+                            } ${selectedDay === 'all' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Vue Planning"
+                        >
+                            <GanttChartSquare size={16}/>
+                            <span className="hidden sm:inline">Planning</span>
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                viewMode === 'list' ? 'bg-white text-[#033238] shadow-sm' : 'text-slate-600 hover:bg-white/60'
+                            }`}
+                            title="Vue Liste"
+                        >
+                           <List size={16}/>
+                           <span className="hidden sm:inline">Liste</span>
+                        </button>
+                    </div>
+
+                    {hasActiveFilters && (
+                        <button
+                            onClick={resetFilters}
+                            className="text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1 p-2.5 rounded-lg hover:bg-slate-100"
+                            title="Réinitialiser les filtres"
+                        >
+                            <X size={16}/>
+                        </button>
+                    )}
                 </div>
-                 {hasActiveFilters && <button
-                    onClick={resetFilters}
-                    className="text-sm text-slate-600 hover:text-[#033238] text-center flex items-center justify-center gap-1"
-                 >
-                    <X size={14}/> Réinitialiser
-                </button>}
             </div>
-             {!searchQuery && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200">
+
+             {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200 animate-fade-in-up">
                 <select value={filters.theme} onChange={(e) => setFilters({ ...filters, theme: e.target.value === 'Tous' ? '' : e.target.value })} className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full bg-white">
                   {THEMES.map(theme => <option key={theme} value={theme}>{theme}</option>)}
                 </select>
