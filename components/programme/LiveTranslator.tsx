@@ -17,7 +17,7 @@ interface LiveTranslatorProps {
 
 const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     const [targetLang, setTargetLang] = useState('en'); // Anglais par défaut
-    const [translatedSegments, setTranslatedSegments] = useState<string[]>([]);
+    const [translatedText, setTranslatedText] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
     const [isRetrying, setIsRetrying] = useState(false);
     const [isPendingTranslation, setIsPendingTranslation] = useState(false);
@@ -40,59 +40,56 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     const isProcessingRef = useRef(false);
     const fullTranscript = finalTranscript + interimTranscript;
     
-    // Fonction pour diviser le texte en segments basés sur les pauses
-    const splitIntoSegments = useCallback((text: string): string[] => {
-        // Diviser par les ponctuations fortes qui indiquent une pause
-        return text.split(/(?<=[.!?])\s+/).filter(segment => segment.trim().length > 0);
+    // Fonction pour diviser le texte en petits fragments pour une traduction rapide
+    const splitIntoFragments = useCallback((text: string): string[] => {
+        // Diviser en phrases complètes mais en fragments plus petits
+        const sentences = text.split(/(?<=[.!?])\s+/);
+        const fragments: string[] = [];
+        
+        for (const sentence of sentences) {
+            if (sentence.length > 100) {
+                // Diviser les longues phrases en fragments de ~100 caractères
+                let remaining = sentence;
+                while (remaining.length > 0) {
+                    const fragment = remaining.substring(0, 100);
+                    fragments.push(fragment);
+                    remaining = remaining.substring(100);
+                }
+            } else {
+                fragments.push(sentence);
+            }
+        }
+        
+        return fragments.filter(fragment => fragment.trim().length > 0);
     }, []);
     
-    // Amélioration du défilement automatique
+    // Défilement automatique optimisé
     const scrollToBottom = useCallback(() => {
         if (translatedPanelRef.current) {
+            // Utiliser requestAnimationFrame pour un défilement fluide
             requestAnimationFrame(() => {
                 const element = translatedPanelRef.current;
                 if (element) {
-                    const scrollHeight = element.scrollHeight;
-                    const height = element.clientHeight;
-                    const maxScrollTop = scrollHeight - height;
-                    
-                    if (Math.abs(element.scrollTop - maxScrollTop) > 5) {
-                        element.scrollTop = maxScrollTop;
-                        console.log('📜 Scroll automatique effectué');
-                    }
+                    // Forcer le défilement immédiat en bas
+                    element.scrollTop = element.scrollHeight;
+                    console.log('📜 Scroll automatique effectué');
                 }
             });
         }
     }, []);
     
-    // Gestion du défilement avec MutationObserver
+    // Effet pour le défilement automatique à chaque mise à jour du texte
     useEffect(() => {
-        if (translatedSegments.length > 0) {
-            const observer = new MutationObserver(() => {
-                scrollToBottom();
-            });
-            
-            if (translatedPanelRef.current) {
-                observer.observe(translatedPanelRef.current, {
-                    childList: true,
-                    subtree: true,
-                    characterData: true
-                });
-            }
-            
+        if (translatedText) {
             scrollToBottom();
-            
-            return () => {
-                observer.disconnect();
-            };
         }
-    }, [translatedSegments, scrollToBottom]);
+    }, [translatedText, scrollToBottom]);
     
     // Traduction optimisée pour une latence minimale
-    const translateSegment = useCallback(async (segment: string): Promise<string> => {
-        if (!segment.trim()) return '';
+    const translateFragment = useCallback(async (fragment: string): Promise<string> => {
+        if (!fragment.trim()) return '';
         
-        console.log('🔥 Traduction du segment:', segment.substring(0, 50) + '...');
+        console.log('🔥 Traduction du fragment:', fragment.substring(0, 50) + '...');
         
         try {
             const response = await fetch('/api/groq-proxy', {
@@ -103,7 +100,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                 body: JSON.stringify({
                     type: 'translate',
                     payload: { 
-                        text: segment.trim(), 
+                        text: fragment.trim(), 
                         targetLang: targetLang
                     }
                 }),
@@ -121,7 +118,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         }
     }, [targetLang]);
     
-    // Gestion de la transcription avec détection des pauses
+    // Gestion de la transcription avec traitement en temps réel
     useEffect(() => {
         if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
@@ -133,28 +130,28 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                 console.log('Nouveau texte à traiter:', newText);
                 sentTranscriptRef.current = fullTranscript;
                 
-                // Diviser en segments basés sur les pauses
-                const segments = splitIntoSegments(newText);
+                // Diviser en fragments pour une traduction rapide
+                const fragments = splitIntoFragments(newText);
                 
-                // Traiter chaque segment
-                for (const segment of segments) {
-                    if (segment.trim()) {
+                // Traiter chaque fragment
+                for (const fragment of fragments) {
+                    if (fragment.trim()) {
                         setIsTranslating(true);
                         setIsPendingTranslation(false);
                         
                         try {
-                            const translatedSegment = await translateSegment(segment);
+                            const translatedFragment = await translateFragment(fragment);
                             
-                            // Ajouter le segment traduit comme un nouveau paragraphe
-                            setTranslatedSegments(prev => [...prev, translatedSegment]);
+                            // Ajouter le fragment traduit au texte existant (sans saut de ligne)
+                            setTranslatedText(prev => prev + (prev ? ' ' : '') + translatedFragment);
                         } catch (error) {
-                            console.error('Erreur lors de la traduction du segment:', error);
+                            console.error('Erreur lors de la traduction du fragment:', error);
                             setApiError("Erreur de traduction. Nouvelle tentative...");
                             
                             // Réessayer après un court délai
                             setTimeout(() => {
-                                translateSegment(segment).then(translatedSegment => {
-                                    setTranslatedSegments(prev => [...prev, translatedSegment]);
+                                translateFragment(fragment).then(translatedFragment => {
+                                    setTranslatedText(prev => prev + (prev ? ' ' : '') + translatedFragment);
                                     setApiError(null);
                                 });
                             }, 1000);
@@ -167,8 +164,8 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         };
         
         if (isListening && fullTranscript) {
-            // Délai court pour permettre la capture de phrases complètes
-            debounceTimerRef.current = window.setTimeout(processTranscript, 500);
+            // Délai très court pour une réactivité maximale
+            debounceTimerRef.current = window.setTimeout(processTranscript, 300);
             
             // Indicateur visuel pendant l'attente
             if (sentTranscriptRef.current.length === 0) {
@@ -184,7 +181,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                 clearTimeout(debounceTimerRef.current);
             }
         };
-    }, [fullTranscript, isListening, translateSegment, splitIntoSegments]);
+    }, [fullTranscript, isListening, translateFragment, splitIntoFragments]);
     
     const handleToggleListening = useCallback(() => {
         if (isListening) {
@@ -194,7 +191,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             }
         } else {
             // Reset de l'état
-            setTranslatedSegments([]);
+            setTranslatedText('');
             setDetectedLanguage(null);
             setIsPendingTranslation(false);
             sentTranscriptRef.current = '';
@@ -215,9 +212,6 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
             }
         };
     }, []);
-    
-    // Combiner tous les segments traduits pour l'affichage
-    const combinedText = translatedSegments.join('\n\n');
     
     return (
         <div className="flex flex-col flex-grow min-h-0">
@@ -255,7 +249,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                         overflowY: 'scroll',
                         overflowX: 'hidden',
                         maxHeight: '100%',
-                        scrollBehavior: 'auto'
+                        scrollBehavior: 'auto' // Utiliser 'auto' pour un défilement instantané
                     }}
                 >
                     <div className="flex items-center justify-between mb-4">
@@ -279,7 +273,7 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                         )}
                     </div>
                     
-                    {!isListening && translatedSegments.length === 0 && !isPendingTranslation ? (
+                    {!isListening && !translatedText && !isPendingTranslation ? (
                         <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 -mt-8">
                             <Languages size={48} className="mb-4 text-slate-400" />
                             <h3 className="text-lg font-semibold">Prêt à traduire</h3>
@@ -287,14 +281,14 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
                         </div>
                     ) : (
                         <>
-                            {isPendingTranslation && translatedSegments.length === 0 && (
+                            {isPendingTranslation && !translatedText && (
                                 <div className="flex items-center justify-center text-orange-600 text-sm mb-4">
                                     <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse mr-2"></div>
                                     Écoute de la conférence en cours...
                                 </div>
                             )}
-                            <div className="text-slate-800 whitespace-pre-wrap leading-relaxed text-lg break-words">
-                                {combinedText}
+                            <div className="text-slate-800 leading-relaxed text-lg break-words">
+                                {translatedText}
                                 {(isTranslating || isRetrying || isPendingTranslation) && (
                                     <span className={`inline-block w-2.5 h-6 animate-pulse ml-1 align-bottom rounded-sm ${
                                         isPendingTranslation ? 'bg-orange-500' : 'bg-slate-600'
