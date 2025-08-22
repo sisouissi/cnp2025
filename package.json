@@ -12,7 +12,8 @@
     "react-dom": "^19.1.1",
     "react": "^19.1.1",
     "lucide-react": "0.418.0",
-    "groq-sdk": "latest"
+    "groq-sdk": "latest",
+    "@google/genai": "^1.15.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

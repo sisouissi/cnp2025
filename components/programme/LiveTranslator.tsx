@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Session } from '../../types';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { ArrowLeft, Mic, Square, Languages, AlertCircle } from 'lucide-react';
@@ -19,20 +19,10 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     const [translatedText, setTranslatedText] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
     const [apiError, setApiError] = useState<string | null>(null);
-    const { 
-        isListening, 
-        finalTranscript, 
-        interimTranscript, 
-        startListening, 
-        stopListening, 
-        error: recognitionError 
-    } = useSpeechRecognition();
+    const { isListening, finalTranscript, startListening, stopListening, error: recognitionError } = useSpeechRecognition();
     
-    const sentTranscriptRef = useRef('');
+    const lastTranslatedRef = useRef('');
     const translatedPanelRef = useRef<HTMLDivElement>(null);
-    const debounceTimerRef = useRef<number | null>(null);
-
-    const fullTranscript = finalTranscript + interimTranscript;
     
     const scrollToBottom = (ref: React.RefObject<HTMLDivElement>) => {
         if (ref.current) {
@@ -41,10 +31,18 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
     };
 
     useEffect(() => {
+        if (finalTranscript.length > lastTranslatedRef.current.length) {
+            const newTextToTranslate = finalTranscript.substring(lastTranslatedRef.current.length);
+            lastTranslatedRef.current = finalTranscript;
+            translateText(newTextToTranslate.trim());
+        }
+    }, [finalTranscript, targetLang]);
+    
+    useEffect(() => {
         scrollToBottom(translatedPanelRef);
     }, [translatedText, isTranslating]);
 
-    const translateText = useCallback(async (text: string) => {
+    const translateText = async (text: string) => {
         if (!text) return;
         
         setIsTranslating(true);
@@ -109,42 +107,14 @@ const LiveTranslator: React.FC<LiveTranslatorProps> = ({ session, onBack }) => {
         } finally {
             setIsTranslating(false);
         }
-    }, [targetLang]);
-
-    useEffect(() => {
-        if (debounceTimerRef.current) {
-            clearTimeout(debounceTimerRef.current);
-        }
-        
-        const processTranscript = () => {
-            const textToSend = fullTranscript.substring(sentTranscriptRef.current.length).trim();
-            if (textToSend) {
-                sentTranscriptRef.current = fullTranscript;
-                translateText(textToSend);
-            }
-        };
-
-        if (isListening) {
-            // Utilise un debounce pour envoyer le texte lorsque l'utilisateur fait une pause
-            debounceTimerRef.current = window.setTimeout(processTranscript, 500);
-        } else if (fullTranscript.length > sentTranscriptRef.current.length) {
-            // Lorsque l'écoute s'arrête, envoie immédiatement tout texte restant
-            processTranscript();
-        }
-
-        return () => {
-            if (debounceTimerRef.current) {
-                clearTimeout(debounceTimerRef.current);
-            }
-        };
-    }, [fullTranscript, isListening, translateText]);
+    };
 
     const handleToggleListening = () => {
         if (isListening) {
             stopListening();
         } else {
             setTranslatedText('');
-            sentTranscriptRef.current = '';
+            lastTranslatedRef.current = '';
             startListening();
         }
     };

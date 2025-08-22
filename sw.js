@@ -12,9 +12,6 @@ const urlsToCache = [
   'https://esm.sh/react@^19.1.1',
   'https://esm.sh/lucide-react@0.418.0',
   'https://esm.sh/groq-sdk',
-  // Main images
-  'https://i.imgur.com/SRKadAD.jpg',
-  'https://i.imgur.com/OduHjDf.jpeg',
 ];
 
 self.addEventListener('install', (event) => {

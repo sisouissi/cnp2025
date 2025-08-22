@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import type { Tab } from '../App';
 import Footer from '../components/layout/Footer';
@@ -36,25 +37,15 @@ const HomePage: React.FC<HomePageProps> = ({ setActiveTab, onSessionSelect }) =>
 
     return (
     <>
-      <div className="bg-white shadow-inner-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <img
-            src="https://i.imgur.com/SRKadAD.jpg"
-            alt="Bannière du 29e Congrès National de Pneumologie"
-            className="max-w-full h-auto rounded-xl shadow-xl"
-          />
-        </div>
-      </div>
-
       <div className="relative bg-gradient-to-b from-slate-50 to-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
+          <div className="grid grid-cols-1 gap-12 items-center">
+            <div className="space-y-8 lg:max-w-3xl lg:mx-auto">
               <div>
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-900 mb-4 leading-tight tracking-tighter">
+                <h1 className="text-center text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-900 mb-4 leading-tight tracking-tighter">
                   29<sup>ème</sup> Congrès de Pneumologie
                 </h1>
-                <p className="text-lg text-slate-600 mb-6">27 - 29 Novembre 2025 | Hôtel Movenpick, Tunis</p>
+                <p className="text-center text-lg text-slate-600 mb-6">27 - 29 Novembre 2025 | Hôtel Movenpick, Tunis</p>
                 <div className="bg-gradient-to-r from-[#033238] to-[#054c55] rounded-xl p-6 text-white shadow-2xl">
                   <h2 className="text-xl font-bold mb-2 opacity-80">Thème Principal</h2>
                   <p className="text-3xl font-semibold">Quand le poumon s'exacerbe</p>
@@ -75,7 +66,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActiveTab, onSessionSelect }) =>
 
               <CountdownDisplay />
 
-              <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
+              <div className="flex flex-col sm:flex-row gap-4 flex-wrap justify-center">
                 <button
                   onClick={() => setActiveTab('programme')}
                   className="flex items-center justify-center gap-2 bg-[#033238] text-white px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:bg-[#02262B] transition-all duration-300 transform hover:scale-105"
@@ -99,14 +90,6 @@ const HomePage: React.FC<HomePageProps> = ({ setActiveTab, onSessionSelect }) =>
                   </button>
                 )}
               </div>
-            </div>
-
-            <div className="relative hidden lg:block p-8">
-              <img
-                src="https://i.imgur.com/OduHjDf.jpeg"
-                alt="Affiche du 29e Congrès National de Pneumologie"
-                className="rounded-2xl shadow-2xl w-full h-auto object-cover transform rotate-3"
-              />
             </div>
           </div>
         </div>

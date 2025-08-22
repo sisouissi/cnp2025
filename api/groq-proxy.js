@@ -1,113 +1,106 @@
-// Ce fichier est une fonction "serverless" Vercel.
-// Il reçoit les requêtes de l'application, appelle l'API Groq en utilisant
-// la clé API secrète stockée dans les variables d'environnement de Vercel,
-// et renvoie la réponse à l'application.
-// La clé API n'est jamais exposée au navigateur.
+// This file is a Vercel serverless function.
+// It receives requests from the app, calls the Google Gemini API using
+// the secret API key stored in Vercel environment variables,
+// and returns the response to the app.
+// The API key is never exposed to the browser.
+import { GoogleGenAI } from "@google/genai";
 
-// Une fonction d'aide pour envoyer des réponses JSON de manière cohérente
+// A helper function to send JSON responses consistently
 const sendJson = (response, statusCode, data) => {
   response.status(statusCode).json(data);
 };
 
-// Utilisation de l'exportation par défaut pour la compatibilité avec les modules ES
+// Using default export for ES Modules compatibility
 export default async function handler(request, response) {
-  // Accepter uniquement les requêtes POST
+  // Only accept POST requests
   if (request.method !== 'POST') {
     return sendJson(response, 405, { error: 'Method Not Allowed' });
   }
 
   try {
-    const groqApiKey = process.env.GROQ_API_KEY;
+    const apiKey = process.env.API_KEY; // As per Gemini guidelines
 
-    // Vérifier si la clé API est configurée sur le serveur Vercel
-    if (!groqApiKey) {
-      console.error('La variable d\'environnement GROQ_API_KEY n\'est pas configurée sur le serveur.');
-      return sendJson(response, 500, { error: "La configuration du serveur est incomplète." });
+    // Check if the API key is configured on the Vercel server
+    if (!apiKey) {
+      console.error('The API_KEY environment variable is not set on the server.');
+      return sendJson(response, 500, { error: "Server configuration is incomplete." });
     }
     
-    // Vercel analyse généralement le corps pour le JSON, mais nous ajoutons une vérification pour la robustesse.
-    // Si le corps est une chaîne, nous l'analysons. Sinon, nous l'utilisons directement.
+    const ai = new GoogleGenAI({ apiKey });
+    
     const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body;
     const { type, payload } = body || {};
 
     if (!type || !payload) {
-      return sendJson(response, 400, { error: 'La requête est malformée. Le type ou le payload est manquant.' });
+      return sendJson(response, 400, { error: 'Malformed request. Type or payload is missing.' });
     }
 
     if (type === 'summarize') {
-      const model = "llama3-70b-8192"; // Utiliser un modèle plus puissant pour des résumés de meilleure qualité
       const { text } = payload;
       if (!text) {
-        return sendJson(response, 400, { error: 'Le texte pour le résumé est manquant.' });
+        return sendJson(response, 400, { error: 'Text for summary is missing.' });
       }
-      const messages = [
-        { role: "system", content: "Tu es un assistant expert en pneumologie. Ton rôle est de résumer des transcriptions de conférences de manière concise et claire, en structurant le résumé en quelques points clés importants sur des lignes séparées." },
-        { role: "user", content: `Voici la transcription:\n\n"${text}"` }
-      ];
+      
+      const systemInstruction = "Tu es un assistant expert en pneumologie. Ton rôle est de résumer des transcriptions de conférences de manière concise et claire, en structurant le résumé en quelques points clés importants sur des lignes séparées.";
+      const userContent = `Voici la transcription:\n\n"${text}"`;
 
-      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, model })
+      const result = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: userContent,
+        config: { systemInstruction }
       });
-
-      if (!groqResponse.ok) {
-        const errorBody = await groqResponse.text();
-        console.error('Erreur API Groq (summarize):', errorBody);
-        throw new Error(`L'API Groq a répondu avec le statut ${groqResponse.status}`);
-      }
-
-      const groqData = await groqResponse.json();
-      const resultText = groqData.choices[0]?.message?.content?.trim() || null;
+      
+      const resultText = result.text;
 
       if (resultText) {
         return sendJson(response, 200, { result: resultText });
       } else {
-        return sendJson(response, 500, { error: "La réponse de l'API Groq était vide ou malformée." });
+        return sendJson(response, 500, { error: "The Gemini API response was empty or malformed." });
       }
 
     } else if (type === 'translate') {
-      const model = "llama3-8b-8192"; // Utiliser un modèle plus rapide pour une traduction fluide en temps réel
       const { text, langName } = payload;
       if (!text || !langName) {
-        return sendJson(response, 400, { error: 'Le texte ou la langue pour la traduction est manquant.' });
+        return sendJson(response, 400, { error: 'Text or language for translation is missing.' });
       }
-      const messages = [
-        { role: "system", content: `You are a translation assistant. Translate the user's text from French to ${langName}. Provide only the direct translation, without any extra phrases or explanations.` },
-        { role: "user", content: text }
-      ];
+      
+      const systemInstruction = `You are a translation assistant. Translate the user's text from French to ${langName}. Provide only the direct translation, without any extra phrases or explanations.`;
 
-      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, model, stream: true })
+      const streamResult = await ai.models.generateContentStream({
+        model: "gemini-2.5-flash",
+        contents: text,
+        config: { 
+          systemInstruction,
+          thinkingConfig: { thinkingBudget: 0 } 
+        }
       });
-
-      if (!groqResponse.ok) {
-        const errorBody = await groqResponse.text();
-        console.error('Erreur API Groq (translate):', errorBody);
-        return sendJson(response, groqResponse.status, { error: `L'API Groq a répondu avec le statut ${groqResponse.status}` });
-      }
 
       response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       response.setHeader('Cache-Control', 'no-cache');
       response.setHeader('Connection', 'keep-alive');
 
-      const stream = groqResponse.body;
-      for await (const chunk of stream) {
-        response.write(chunk);
+      for await (const chunk of streamResult) {
+        const textChunk = chunk.text;
+        if (textChunk) {
+          const sseChunk = {
+            choices: [{ delta: { content: textChunk } }]
+          };
+          response.write(`data: ${JSON.stringify(sseChunk)}\n\n`);
+        }
       }
+      
+      response.write('data: [DONE]\n\n');
       response.end();
-      return; // Fin du gestionnaire, le flux a été géré
+      return; // End handler, stream has been handled
 
     } else {
-      return sendJson(response, 400, { error: 'Type de requête invalide.' });
+      return sendJson(response, 400, { error: 'Invalid request type.' });
     }
 
   } catch (error) {
-    console.error('Erreur dans la fonction proxy:', error);
-    // S'assurer que nous envoyons toujours une réponse d'erreur JSON
-    const errorMessage = error instanceof Error ? error.message : 'Une erreur interne du serveur est survenue.';
+    console.error('Error in proxy function:', error);
+    // Ensure we always send a JSON error response
+    const errorMessage = error instanceof Error ? error.message : 'An internal server error occurred.';
     if (!response.headersSent) {
       return sendJson(response, 500, { error: errorMessage });
     }
